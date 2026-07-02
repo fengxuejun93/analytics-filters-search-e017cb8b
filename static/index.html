@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二手货品置换平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-inner">
+            <h1 class="logo" onclick="navigateTo('list')">🔄 二手置换平台</h1>
+            <button class="btn btn-primary" onclick="showCreateForm()">+ 发布货品</button>
+        </div>
+    </header>
+
+    <!-- 统计区域 -->
+    <section class="stats-bar" id="stats-bar">
+        <div class="stat-card stat-listed"><span class="stat-num" id="stat-listed">0</span><span class="stat-label">上架中</span></div>
+        <div class="stat-card stat-pending"><span class="stat-num" id="stat-pending">0</span><span class="stat-label">待处理申请</span></div>
+        <div class="stat-card stat-exchanged"><span class="stat-num" id="stat-exchanged">0</span><span class="stat-label">已达成置换</span></div>
+        <div class="stat-card stat-delisted"><span class="stat-num" id="stat-delisted">0</span><span class="stat-label">已下架</span></div>
+    </section>
+
+    <!-- 列表视图 -->
+    <main id="view-list" class="view active">
+        <div class="filters">
+            <input type="text" id="filter-keyword" placeholder="搜索关键词..." oninput="loadItems()">
+            <select id="filter-category" onchange="loadItems()"><option value="">全部品类</option></select>
+            <select id="filter-city" onchange="loadItems()"><option value="">全部城市</option></select>
+            <select id="filter-status" onchange="loadItems()">
+                <option value="">全部状态</option>
+                <option value="listed">上架中</option>
+                <option value="exchanged">已置换</option>
+                <option value="delisted">已下架</option>
+            </select>
+            <button class="btn btn-secondary" onclick="clearFilters()">清除筛选</button>
+        </div>
+        <div class="item-grid" id="item-grid"></div>
+        <div class="empty-state" id="empty-state" style="display:none;">暂无符合条件的货品</div>
+    </main>
+
+    <!-- 详情视图 -->
+    <main id="view-detail" class="view">
+        <button class="btn btn-back" onclick="navigateTo('list')">← 返回列表</button>
+        <div class="detail-layout">
+            <div class="detail-main">
+                <div class="detail-image" id="detail-image">📷 图片占位</div>
+                <div class="detail-info">
+                    <h2 id="detail-title"></h2>
+                    <div class="detail-meta" id="detail-meta"></div>
+                    <div class="detail-section">
+                        <h3>详细描述</h3>
+                        <p id="detail-desc"></p>
+                    </div>
+                    <div class="detail-section">
+                        <h3>交换条件</h3>
+                        <p id="detail-exchange"></p>
+                    </div>
+                    <div class="detail-actions" id="detail-actions"></div>
+                </div>
+            </div>
+            <div class="detail-sidebar">
+                <div class="detail-section">
+                    <h3>置换申请 <button class="btn btn-sm" onclick="showApplyForm()" id="btn-apply-toggle">发起申请</button></h3>
+                    <div id="apply-form" class="apply-form" style="display:none;">
+                        <input type="text" id="apply-applicant" placeholder="你的名字">
+                        <textarea id="apply-message" placeholder="留言说明你能提供的置换物..."></textarea>
+                        <button class="btn btn-primary btn-sm" onclick="submitApplication()">提交申请</button>
+                    </div>
+                    <div id="application-list"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 创建/编辑视图 -->
+    <main id="view-form" class="view">
+        <button class="btn btn-back" onclick="navigateTo('list')">← 返回列表</button>
+        <div class="form-container">
+            <h2 id="form-title">发布新货品</h2>
+            <form id="item-form" onsubmit="submitItemForm(event)">
+                <input type="hidden" id="form-item-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>标题 *</label>
+                        <input type="text" id="form-field-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label>品类 *</label>
+                        <select id="form-field-category" required>
+                            <option value="">请选择</option>
+                            <option value="数码电子">数码电子</option>
+                            <option value="家具家居">家具家居</option>
+                            <option value="运动户外">运动户外</option>
+                            <option value="图书文具">图书文具</option>
+                            <option value="服装鞋包">服装鞋包</option>
+                            <option value="母婴玩具">母婴玩具</option>
+                            <option value="美妆个护">美妆个护</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>成色</label>
+                        <select id="form-field-condition">
+                            <option value="全新">全新</option>
+                            <option value="九五新">九五新</option>
+                            <option value="九成新">九成新</option>
+                            <option value="八成新">八成新</option>
+                            <option value="七成新">七成新</option>
+                            <option value="五成新及以下">五成新及以下</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>所在城市 *</label>
+                        <input type="text" id="form-field-city" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>期望置换物</label>
+                        <input type="text" id="form-field-exchange">
+                    </div>
+                    <div class="form-group">
+                        <label>发布人 *</label>
+                        <input type="text" id="form-field-publisher" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>详细描述</label>
+                    <textarea id="form-field-description" rows="4"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" class="btn btn-secondary" onclick="navigateTo('list')">取消</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <!-- 消息提示 -->
+    <div id="toast" class="toast" style="display:none;"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

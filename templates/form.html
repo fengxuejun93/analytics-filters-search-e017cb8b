@@ -1,0 +1,117 @@
+{{define "content"}}
+{{$data := .Data}}
+{{$item := $data.Item}}
+
+<div class="form-header">
+    <a href="/" class="back-link">← 返回列表</a>
+    <h1 class="form-page-title">
+        {{if $data.IsEdit}}
+        <span>✏️</span> 编辑置换信息
+        {{else}}
+        <span>➕</span> 发布置换信息
+        {{end}}
+    </h1>
+</div>
+
+<div class="form-container">
+    <form method="POST" 
+          action="{{if $data.IsEdit}}/items/{{$item.ID}}/edit{{else}}/items/new{{end}}" 
+          class="item-form">
+        
+        <div class="form-row">
+            <div class="form-group col-full">
+                <label class="form-label">📦 物品标题 *</label>
+                <input type="text" name="title" class="form-input" 
+                       value="{{if $item}}{{$item.Title}}{{end}}"
+                       placeholder="例如：MacBook Pro 2020 13寸" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">📂 物品品类 *</label>
+                <select name="category" class="form-select" required>
+                    <option value="">请选择品类</option>
+                    {{range $data.Categories}}
+                    <option value="{{.}}" {{if and $item (eq . $item.Category)}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">⭐ 成色 *</label>
+                <select name="condition" class="form-select" required>
+                    <option value="">请选择成色</option>
+                    {{range $data.Conditions}}
+                    <option value="{{.}}" {{if and $item (eq . $item.Condition)}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">📍 所在城市 *</label>
+                <select name="city" class="form-select" required>
+                    <option value="">请选择城市</option>
+                    {{range $data.Cities}}
+                    <option value="{{.}}" {{if and $item (eq . $item.City)}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">👤 发布人</label>
+                <input type="text" name="owner" class="form-input" 
+                       value="{{if $item}}{{$item.Owner}}{{else}}模拟用户{{end}}" readonly>
+            </div>
+
+            {{if $data.IsEdit}}
+            <div class="form-group">
+                <label class="form-label">🔘 物品状态</label>
+                <select name="status" class="form-select">
+                    <option value="on_sale" {{if eq $item.Status "on_sale"}}selected{{end}}>上架中</option>
+                    <option value="offline" {{if eq $item.Status "offline"}}selected{{end}}>已下架</option>
+                </select>
+            </div>
+            {{end}}
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-full">
+                <label class="form-label">📝 物品描述 *</label>
+                <textarea name="description" class="form-textarea" rows="4" 
+                          placeholder="详细描述物品的情况，包括购买时间、使用情况、有无瑕疵等..." 
+                          required>{{if $item}}{{$item.Description}}{{end}}</textarea>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-full">
+                <label class="form-label">🔄 期望置换物 *</label>
+                <input type="text" name="expected_exchange" class="form-input" 
+                       value="{{if $item}}{{$item.ExpectedExchange}}{{end}}"
+                       placeholder="例如：iPhone 13 Pro 或同价位 Windows 笔记本" required>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <span>💾</span> 
+                {{if $data.IsEdit}}保存修改{{else}}发布信息{{end}}
+            </button>
+            <a href="/" class="btn btn-secondary btn-lg">
+                <span>❌</span> 取消
+            </a>
+            {{if $data.IsEdit}}
+            <form method="POST" action="/items/{{$item.ID}}/delete" class="inline-form"
+                  onsubmit="return confirm('确定要下架这件商品吗？');">
+                <button type="submit" class="btn btn-danger btn-lg">
+                    <span>📴</span> 下架商品
+                </button>
+            </form>
+            {{end}}
+        </div>
+    </form>
+</div>
+{{end}}

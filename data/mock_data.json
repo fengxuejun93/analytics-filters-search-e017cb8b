@@ -1,0 +1,164 @@
+{
+  "items": [
+    {
+      "id": "item005",
+      "title": "Nike Air Max 运动鞋 42码",
+      "category": "服饰鞋帽",
+      "condition": "全新",
+      "city": "杭州",
+      "owner": "潮鞋收藏家",
+      "description": "Nike Air Max 90 经典款，黑白配色，42码。全新未拆封，官方渠道购买，支持验货。因尺码不合适转出。",
+      "expected_exchange": "Adidas Yeezy 系列 或 其他同价位运动鞋",
+      "status": "on_sale",
+      "images": [
+        "shoes"
+      ],
+      "created_at": "2026-06-29T20:23:35+08:00",
+      "updated_at": "2026-06-29T20:23:35+08:00"
+    },
+    {
+      "id": "item006",
+      "title": "捷安特山地自行车",
+      "category": "运动户外",
+      "condition": "明显使用",
+      "city": "成都",
+      "owner": "骑行爱好者",
+      "description": "捷安特 ATX 777 山地车，27速，碟刹。使用三年，有正常使用痕迹，各部件功能正常，定期保养维护。适合通勤或周末骑行。",
+      "expected_exchange": "公路自行车 或 健身器材套装",
+      "status": "completed",
+      "images": [
+        "bike"
+      ],
+      "created_at": "2026-06-11T20:23:35+08:00",
+      "updated_at": "2026-06-30T20:23:35+08:00"
+    },
+    {
+      "id": "item007",
+      "title": "戴森 V8 吸尘器",
+      "category": "家居用品",
+      "condition": "功能正常",
+      "city": "武汉",
+      "owner": "居家小能手",
+      "description": "戴森 V8 Absolute 无线吸尘器，主机+5个吸头+充电底座。使用四年，电池续航约20分钟，吸力正常。外观有使用痕迹但功能完好。",
+      "expected_exchange": "扫地机器人 或 空气净化器",
+      "status": "on_sale",
+      "images": [
+        "vacuum"
+      ],
+      "created_at": "2026-06-27T20:23:35+08:00",
+      "updated_at": "2026-06-27T20:23:35+08:00"
+    },
+    {
+      "id": "item008",
+      "title": "iPad Pro 11寸 2021款",
+      "category": "数码电子",
+      "condition": "几乎全新",
+      "city": "南京",
+      "owner": "学生小张",
+      "description": "iPad Pro 11寸 M1芯片，256GB WiFi版，深空灰色。带原装Apple Pencil 2代和妙控键盘。使用不到半年，因毕业准备换电脑转出。",
+      "expected_exchange": "16寸 MacBook Pro 或 台式机整机",
+      "status": "offline",
+      "images": [
+        "ipad"
+      ],
+      "created_at": "2026-06-16T20:23:35+08:00",
+      "updated_at": "2026-06-23T20:23:35+08:00"
+    },
+    {
+      "id": "item001",
+      "title": "MacBook Pro 2020 13寸",
+      "category": "数码电子",
+      "condition": "几乎全新",
+      "city": "北京",
+      "owner": "数码达人",
+      "description": "2020款 MacBook Pro 13寸，M1芯片，16GB内存，512GB存储。电池循环次数89次，保养良好，无磕碰划痕。原包装盒和充电器齐全，购买凭证可查。",
+      "expected_exchange": "iPhone 13 Pro 或同价位 Windows 笔记本",
+      "status": "on_sale",
+      "images": [
+        "laptop"
+      ],
+      "created_at": "2026-06-24T20:23:35+08:00",
+      "updated_at": "2026-06-24T20:23:35+08:00"
+    },
+    {
+      "id": "item002",
+      "title": "索尼 A7M4 全画幅相机",
+      "category": "数码电子",
+      "condition": "轻微使用",
+      "city": "上海",
+      "owner": "摄影爱好者",
+      "description": "索尼 A7M4 机身 + 24-70mm F4 镜头套装。快门次数约8000次，使用爱惜。屏幕贴了钢化膜，机身有轻微使用痕迹但不影响功能。",
+      "expected_exchange": "大疆 Mavic 3 无人机 或 等价摄影器材",
+      "status": "on_sale",
+      "images": [
+        "camera"
+      ],
+      "created_at": "2026-06-26T20:23:35+08:00",
+      "updated_at": "2026-06-26T20:23:35+08:00"
+    },
+    {
+      "id": "item003",
+      "title": "《人类简史》三部曲套装",
+      "category": "图书文具",
+      "condition": "几乎全新",
+      "city": "广州",
+      "owner": "书虫小李",
+      "description": "包含《人类简史》《未来简史》《今日简史》三册，尤瓦尔·赫拉利著作。仅翻阅过一次，书角无折损，无笔记划线。",
+      "expected_exchange": "其他社科类书籍 或  Kindle 电子书阅读器",
+      "status": "pending",
+      "images": [
+        "books"
+      ],
+      "created_at": "2026-06-21T20:23:35+08:00",
+      "updated_at": "2026-06-28T20:23:35+08:00"
+    },
+    {
+      "id": "item004",
+      "title": "宜家双人沙发 灰色",
+      "category": "家居用品",
+      "condition": "轻微使用",
+      "city": "深圳",
+      "owner": "搬家的小王",
+      "description": "宜家 KLIPPAN 双人沙发，灰色织物面料。使用两年，定期清洁保养，无污渍无破损。因搬家无法带走，诚意置换。",
+      "expected_exchange": "同价位餐桌椅套装 或 折叠床",
+      "status": "on_sale",
+      "images": [
+        "sofa"
+      ],
+      "created_at": "2026-06-28T20:23:35+08:00",
+      "updated_at": "2026-06-28T20:23:35+08:00"
+    }
+  ],
+  "exchange_requests": [
+    {
+      "id": "req001",
+      "item_id": "item003",
+      "applicant": "爱读书的猫",
+      "offer_item": "Kindle Paperwhite 5 电子书阅读器",
+      "message": "我有一台几乎全新的 Kindle Paperwhite 5，包装齐全，想换您的三部曲套装。可以面交验货~",
+      "status": "pending",
+      "created_at": "2026-06-28T20:23:35+08:00",
+      "updated_at": "2026-06-28T20:23:35+08:00"
+    },
+    {
+      "id": "req002",
+      "item_id": "item006",
+      "applicant": "健身达人",
+      "offer_item": "全套健身器材（哑铃+杠铃+卧推凳）",
+      "message": "健身器材购入半年，使用次数不多，诚意置换。可以上门看货。",
+      "status": "accepted",
+      "created_at": "2026-06-21T20:23:35+08:00",
+      "updated_at": "2026-06-30T20:23:35+08:00"
+    },
+    {
+      "id": "req003",
+      "item_id": "item001",
+      "applicant": "程序员小明",
+      "offer_item": "ThinkPad X1 Carbon 2021",
+      "message": "ThinkPad X1 Carbon 2021，i7处理器，16GB内存，512GB固态。成色95新，想换您的 MacBook。",
+      "status": "rejected",
+      "created_at": "2026-06-25T20:23:35+08:00",
+      "updated_at": "2026-06-26T20:23:35+08:00"
+    }
+  ]
+}

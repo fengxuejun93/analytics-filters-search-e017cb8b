@@ -1,0 +1,137 @@
+{{define "content"}}
+{{$data := .Data}}
+
+<div class="stats-section">
+    <div class="stats-grid">
+        <div class="stat-card stat-on-sale">
+            <div class="stat-icon">📦</div>
+            <div class="stat-content">
+                <div class="stat-value" id="stat-onsale">{{.Stats.OnSaleCount}}</div>
+                <div class="stat-label">上架中</div>
+            </div>
+        </div>
+        <div class="stat-card stat-pending">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-content">
+                <div class="stat-value" id="stat-pending">{{.Stats.PendingCount}}</div>
+                <div class="stat-label">待处理</div>
+            </div>
+        </div>
+        <div class="stat-card stat-completed">
+            <div class="stat-icon">🤝</div>
+            <div class="stat-content">
+                <div class="stat-value" id="stat-completed">{{.Stats.CompletedCount}}</div>
+                <div class="stat-label">已达成</div>
+            </div>
+        </div>
+        <div class="stat-card stat-offline">
+            <div class="stat-icon">📴</div>
+            <div class="stat-content">
+                <div class="stat-value" id="stat-offline">{{.Stats.OfflineCount}}</div>
+                <div class="stat-label">已下架</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="filter-section">
+    <form class="filter-form" method="GET" action="/">
+        <div class="filter-group">
+            <div class="filter-item">
+                <input type="text" name="keyword" placeholder="🔍 搜索标题或描述..." 
+                       value="{{$data.Filter.Keyword}}" class="form-input search-input">
+            </div>
+            <div class="filter-item">
+                <select name="category" class="form-select">
+                    <option value="">全品类</option>
+                    {{range $data.Categories}}
+                    <option value="{{.}}" {{if eq . $data.Filter.Category}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <div class="filter-item">
+                <select name="city" class="form-select">
+                    <option value="">全部城市</option>
+                    {{range $data.Cities}}
+                    <option value="{{.}}" {{if eq . $data.Filter.City}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <div class="filter-item">
+                <select name="status" class="form-select">
+                    <option value="">全部状态</option>
+                    {{range $key, $val := $data.Statuses}}
+                    <option value="{{$key}}" {{if eq $key $data.Filter.Status}}selected{{end}}>{{$val}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <div class="filter-item">
+                <button type="submit" class="btn btn-primary">筛选</button>
+                <a href="/" class="btn btn-secondary">重置</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="items-section">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="title-icon">📋</span>
+            可用货品
+            <span class="item-count">({{len $data.Items}} 件)</span>
+        </h2>
+    </div>
+
+    {{if $data.Items}}
+    <div class="items-grid">
+        {{range $data.Items}}
+        <a href="/items/{{.ID}}" class="item-card">
+            <div class="item-image-placeholder">
+                {{if .Images}}
+                    {{$imgType := index .Images 0}}
+                    <span class="item-emoji">{{emojiForCategory .Category}}</span>
+                {{else}}
+                    <span class="item-emoji">{{emojiForCategory .Category}}</span>
+                {{end}}
+                <span class="item-status {{.StatusClass}}">{{.StatusText}}</span>
+            </div>
+            <div class="item-content">
+                <h3 class="item-title">{{.Title}}</h3>
+                <div class="item-meta">
+                    <span class="meta-tag">{{.Category}}</span>
+                    <span class="meta-tag meta-condition">{{.Condition}}</span>
+                </div>
+                <div class="item-info">
+                    <p class="info-line">
+                        <span class="info-icon">📍</span>
+                        <span>{{.City}}</span>
+                    </p>
+                    <p class="info-line">
+                        <span class="info-icon">👤</span>
+                        <span>{{.Owner}}</span>
+                    </p>
+                </div>
+                <div class="item-expect">
+                    <span class="expect-label">期望置换：</span>
+                    <span class="expect-value">{{.ExpectedExchange}}</span>
+                </div>
+                <div class="item-footer">
+                    <span class="item-date">{{formatTime .CreatedAt}}</span>
+                    <span class="view-detail">查看详情 →</span>
+                </div>
+            </div>
+        </a>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <h3 class="empty-title">暂无货品</h3>
+        <p class="empty-desc">还没有符合条件的货品，试试调整筛选条件或发布第一件吧！</p>
+        <a href="/items/new" class="btn btn-primary btn-lg">
+            <span>➕</span> 发布置换信息
+        </a>
+    </div>
+    {{end}}
+</div>
+{{end}}

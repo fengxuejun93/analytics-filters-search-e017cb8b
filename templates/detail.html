@@ -1,0 +1,194 @@
+{{define "content"}}
+{{$data := .Data}}
+{{$item := $data.Item}}
+{{$currentUser := $data.CurrentUser}}
+{{$isOwner := eq $item.Owner $currentUser}}
+{{$canApply := and (ne $item.Status "completed") (ne $item.Status "offline") (not $isOwner)}}
+
+<div class="detail-header">
+    <a href="/" class="back-link">← 返回列表</a>
+    <div class="detail-actions">
+        {{if $isOwner}}
+        <a href="/items/{{$item.ID}}/edit" class="btn btn-secondary">
+            <span>✏️</span> 编辑
+        </a>
+        <form method="POST" action="/items/{{$item.ID}}/delete" class="inline-form" 
+              onsubmit="return confirm('确定要下架这件商品吗？');">
+            <button type="submit" class="btn btn-danger">
+                <span>📴</span> 下架
+            </button>
+        </form>
+        {{end}}
+    </div>
+</div>
+
+<div class="detail-layout">
+    <div class="detail-main">
+        <div class="detail-gallery">
+            <div class="main-image-placeholder">
+                <span class="main-emoji">{{emojiForCategory $item.Category}}</span>
+                <span class="detail-status {{$item.StatusClass}}">{{$item.StatusText}}</span>
+            </div>
+        </div>
+
+        <div class="detail-info">
+            <h1 class="detail-title">{{$item.Title}}</h1>
+            
+            <div class="detail-tags">
+                <span class="tag tag-category">{{$item.Category}}</span>
+                <span class="tag tag-condition">{{$item.Condition}}</span>
+                <span class="tag tag-city">📍 {{$item.City}}</span>
+                <span class="tag tag-owner">👤 {{$item.Owner}}</span>
+            </div>
+
+            <div class="detail-section">
+                <h3 class="section-subtitle">📝 物品描述</h3>
+                <p class="detail-description">{{$item.Description}}</p>
+            </div>
+
+            <div class="detail-section">
+                <h3 class="section-subtitle">🔄 期望置换</h3>
+                <div class="exchange-expect">
+                    <span class="expect-text">{{$item.ExpectedExchange}}</span>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <h3 class="section-subtitle">📅 发布信息</h3>
+                <div class="publish-info">
+                    <p><span>发布时间：</span>{{formatTime $item.CreatedAt}}</p>
+                    <p><span>更新时间：</span>{{formatTime $item.UpdatedAt}}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-sidebar">
+        {{if $canApply}}
+        <div class="apply-card">
+            <h3 class="apply-title">💡 发起置换申请</h3>
+            <form method="POST" action="/exchange/apply" class="apply-form">
+                <input type="hidden" name="item_id" value="{{$item.ID}}">
+                
+                <div class="form-group">
+                    <label class="form-label">您的昵称</label>
+                    <input type="text" name="applicant" class="form-input" value="模拟用户" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">您提供的物品 *</label>
+                    <input type="text" name="offer_item" class="form-input" 
+                           placeholder="例如：iPhone 12 128G" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">补充说明</label>
+                    <textarea name="message" class="form-textarea" rows="3"
+                              placeholder="介绍一下您的物品情况..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    <span>📨</span> 提交置换申请
+                </button>
+            </form>
+        </div>
+        {{else if $isOwner}}
+        <div class="owner-tip">
+            <div class="tip-icon">ℹ️</div>
+            <p>这是您发布的商品，您可以在下方处理他人的置换申请。</p>
+        </div>
+        {{else if eq $item.Status "completed"}}
+        <div class="status-tip tip-completed">
+            <div class="tip-icon">🎉</div>
+            <p>这件商品已成功置换，不再接受新的申请。</p>
+        </div>
+        {{else if eq $item.Status "offline"}}
+        <div class="status-tip tip-offline">
+            <div class="tip-icon">📴</div>
+            <p>这件商品已下架，不再接受新的申请。</p>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<div class="exchange-section">
+    <h2 class="section-title">
+        <span class="title-icon">📜</span>
+        置换申请记录
+        <span class="item-count">({{len $data.Requests}} 条)</span>
+    </h2>
+
+    {{if $data.Requests}}
+    <div class="exchange-list">
+        {{range $data.Requests}}
+        <div class="exchange-item">
+            <div class="exchange-header">
+                <div class="exchange-applicant">
+                    <span class="applicant-avatar">👤</span>
+                    <span class="applicant-name">{{.Applicant}}</span>
+                </div>
+                <span class="exchange-status {{exchangeStatusClass .Status}}">{{.StatusText}}</span>
+            </div>
+            
+            <div class="exchange-body">
+                <div class="exchange-offer">
+                    <span class="offer-label">提供物品：</span>
+                    <span class="offer-value">{{.OfferItem}}</span>
+                </div>
+                {{if .Message}}
+                <div class="exchange-message">
+                    <span class="message-label">说明：</span>
+                    <span class="message-value">{{.Message}}</span>
+                </div>
+                {{end}}
+            </div>
+
+            <div class="exchange-footer">
+                <span class="exchange-time">{{formatTime .CreatedAt}}</span>
+                
+                <div class="exchange-actions">
+                    {{if and (eq .Status "pending") $isOwner}}
+                    <form method="POST" action="/exchange/{{.ID}}/accept" class="inline-form">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <span>✅</span> 接受
+                        </button>
+                    </form>
+                    <form method="POST" action="/exchange/{{.ID}}/reject" class="inline-form">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <span>❌</span> 拒绝
+                        </button>
+                    </form>
+                    {{else if and (eq .Status "pending") (eq .Applicant $currentUser)}}
+                    <form method="POST" action="/exchange/{{.ID}}/cancel" class="inline-form"
+                          onsubmit="return confirm('确定要取消这个申请吗？');">
+                        <button type="submit" class="btn btn-secondary btn-sm">
+                            <span>↩️</span> 取消申请
+                        </button>
+                    </form>
+                    {{else if eq .Status "accepted"}}
+                    <span class="action-hint">双方已达成置换协议</span>
+                    {{else if eq .Status "rejected"}}
+                    <span class="action-hint">申请已被拒绝</span>
+                    {{else if eq .Status "canceled"}}
+                    <span class="action-hint">申请已取消</span>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state small">
+        <div class="empty-icon">📭</div>
+        <h3 class="empty-title">暂无申请记录</h3>
+        <p class="empty-desc">
+            {{if $canApply}}
+            成为第一个发起置换申请的人吧！
+            {{else}}
+            还没有人对这件商品发起置换申请。
+            {{end}}
+        </p>
+    </div>
+    {{end}}
+</div>
+{{end}}

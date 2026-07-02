@@ -1,0 +1,63 @@
+{{define "layout.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - 二手置换平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">
+                    <span class="logo-icon">🔄</span>
+                    <span class="logo-text">换享家</span>
+                </a>
+                <nav class="nav">
+                    <a href="/" class="nav-item {{if eq .ActiveMenu "home"}}active{{end}}">
+                        <span>🏠</span> 货品列表
+                    </a>
+                    <a href="/items/new" class="nav-item btn-primary {{if eq .ActiveMenu "new"}}active{{end}}">
+                        <span>➕</span> 发布置换
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    {{if .Error}}
+    <div class="alert alert-danger">
+        <div class="container">
+            <span class="alert-icon">⚠️</span>
+            {{.Error}}
+        </div>
+    </div>
+    {{end}}
+
+    {{if .Success}}
+    <div class="alert alert-success">
+        <div class="container">
+            <span class="alert-icon">✅</span>
+            {{.Success}}
+        </div>
+    </div>
+    {{end}}
+
+    <main class="main">
+        <div class="container">
+            {{template "content" .}}
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p class="footer-text">© 2026 换享家 - 让闲置物品流转起来</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+{{end}}
