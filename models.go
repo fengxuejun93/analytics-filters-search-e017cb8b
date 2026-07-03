@@ -21,6 +21,17 @@ const (
 	AppStatusCancelled ApplicationStatus = "cancelled" // 已取消
 )
 
+// 状态历史记录
+type StatusHistory struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"item_id"`
+	FromStatus string   `json:"from_status"`
+	ToStatus   string   `json:"to_status"`
+	Reason    string    `json:"reason"`
+	Operator  string    `json:"operator"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // 货品模型
 type Item struct {
 	ID               string     `json:"id"`
@@ -79,6 +90,14 @@ type ApplicationRequest struct {
 // 处理置换申请请求
 type ApplicationActionRequest struct {
 	Action string `json:"action"` // accept, reject, cancel
+}
+
+// 聚合详情响应
+type ItemDetailResponse struct {
+	Item           *Item            `json:"item"`
+	Applications   []*Application   `json:"applications"`
+	StatusHistory  []*StatusHistory `json:"status_history"`
+	PendingCount   int              `json:"pending_count"`
 }
 
 // 筛选参数

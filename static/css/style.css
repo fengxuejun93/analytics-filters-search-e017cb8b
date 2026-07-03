@@ -7,6 +7,7 @@
     --c-card: #ffffff;
     --c-text: #1e293b;
     --c-text2: #64748b;
+    --c-text3: #94a3b8;
     --c-border: #e2e8f0;
     --c-success: #16a34a;
     --c-warning: #d97706;
@@ -21,6 +22,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 /* ========== Header ========== */
 .app-header { background: var(--c-primary); color: #fff; padding: 0 24px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-lg); }
 .header-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.header-right { display: flex; align-items: center; gap: 16px; }
+.header-url { font-size: 12px; opacity: .7; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .logo { font-size: 20px; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
 .btn { display: inline-flex; align-items: center; gap: 4px; padding: 8px 16px; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; transition: all .15s; }
 .btn-primary { background: var(--c-primary); color: #fff; }
@@ -34,7 +37,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .btn-warning { background: var(--c-warning); color: #fff; }
 .btn-warning:hover { opacity: .9; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
-.btn-back { margin: 16px 24px 0; }
+.btn-back { margin: 0; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ========== Stats Bar ========== */
@@ -55,6 +58,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .item-grid { max-width: 1200px; margin: 0 auto; padding: 0 24px 40px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
 .item-card { background: var(--c-card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; transition: transform .15s, box-shadow .15s; }
 .item-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.item-card-active { outline: 2px solid var(--c-primary); outline-offset: -2px; }
 .item-card-image { height: 160px; background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); display: flex; align-items: center; justify-content: center; font-size: 48px; color: var(--c-primary); }
 .item-card-body { padding: 16px; }
 .item-card-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -71,19 +75,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .status-delisted { background: #f1f5f9; color: #64748b; }
 .empty-state { max-width: 1200px; margin: 60px auto; text-align: center; color: var(--c-text2); font-size: 16px; }
 
-/* ========== Detail ========== */
+/* ========== Detail Layout ========== */
 .view { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 40px; }
 .view.active { display: block; }
-.detail-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; margin-top: 16px; }
-.detail-main { display: flex; gap: 24px; }
-.detail-image { width: 280px; min-width: 280px; height: 220px; background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); display: flex; align-items: center; justify-content: center; font-size: 64px; color: var(--c-primary); border-radius: var(--radius); }
-.detail-info { flex: 1; }
+.detail-nav { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+.detail-nav-item { font-size: 14px; color: var(--c-text2); max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; }
+.detail-col-left, .detail-col-right { display: flex; flex-direction: column; gap: 20px; }
+.detail-card { background: var(--c-card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+
+/* ========== Detail Image + Info ========== */
+.detail-image { width: 100%; height: 220px; background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); display: flex; align-items: center; justify-content: center; font-size: 64px; color: var(--c-primary); border-radius: var(--radius); margin-bottom: 16px; }
 .detail-info h2 { font-size: 22px; margin-bottom: 12px; }
 .detail-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+
+/* ========== Detail Field Grid ========== */
+.detail-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--c-border); border-radius: var(--radius); overflow: hidden; margin-bottom: 4px; }
+.field-row { display: flex; border-bottom: 1px solid var(--c-border); }
+.field-row:last-child { border-bottom: none; }
+.field-row:nth-child(odd) { background: #f8fafc; }
+.field-label { width: 90px; min-width: 90px; padding: 8px 12px; font-size: 13px; color: var(--c-text2); font-weight: 600; background: rgba(241,245,249,.5); border-right: 1px solid var(--c-border); }
+.field-value { flex: 1; padding: 8px 12px; font-size: 13px; }
+
+/* ========== Detail Sections ========== */
 .detail-section { margin-bottom: 20px; }
+.detail-section:last-child { margin-bottom: 0; }
 .detail-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 .detail-section p { font-size: 14px; color: var(--c-text2); }
 .detail-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+/* ========== Status Hint ========== */
+.detail-status-hint { margin-top: 12px; padding: 10px 14px; background: #fef3c7; border: 1px solid #fcd34d; border-radius: var(--radius); font-size: 13px; color: #92400e; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+.detail-status-hint::before { content: "⚠"; flex-shrink: 0; }
+
+/* ========== Badge ========== */
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--c-primary); color: #fff; font-size: 11px; font-weight: 700; }
 
 /* ========== Applications ========== */
 .app-card { background: var(--c-bg); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; border-left: 3px solid var(--c-border); }
@@ -96,9 +122,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .app-status-badge { font-size: 11px; padding: 1px 8px; border-radius: 10px; font-weight: 600; }
 .app-message { font-size: 13px; color: var(--c-text2); margin-bottom: 6px; }
 .app-time { font-size: 11px; color: #94a3b8; }
-.app-actions { display: flex; gap: 6px; margin-top: 6px; }
+.app-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+.op-hint { font-size: 12px; color: var(--c-text2); font-style: italic; }
 .apply-form { background: var(--c-bg); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
 .apply-form input, .apply-form textarea { padding: 8px; border: 1px solid var(--c-border); border-radius: var(--radius); font-size: 13px; font-family: inherit; resize: vertical; }
+.empty-hint { color: var(--c-text3); font-size: 13px; }
+
+/* ========== Status History Timeline ========== */
+.timeline { position: relative; padding-left: 20px; }
+.timeline::before { content: ''; position: absolute; left: 7px; top: 4px; bottom: 4px; width: 2px; background: var(--c-border); }
+.timeline-item { position: relative; padding-bottom: 16px; }
+.timeline-item:last-child { padding-bottom: 0; }
+.timeline-dot { position: absolute; left: -17px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--c-border); border: 2px solid var(--c-card); }
+.timeline-item-active .timeline-dot { background: var(--c-primary); box-shadow: 0 0 0 3px rgba(79,70,229,.2); }
+.timeline-content { padding-left: 4px; }
+.timeline-title { font-size: 13px; font-weight: 600; color: var(--c-text); }
+.timeline-reason { font-size: 12px; color: var(--c-text2); margin-top: 2px; }
+.timeline-meta { font-size: 11px; color: var(--c-text3); margin-top: 2px; }
 
 /* ========== Form ========== */
 .form-container { max-width: 680px; margin: 16px auto 0; background: var(--c-card); padding: 32px; border-radius: var(--radius); box-shadow: var(--shadow); }
@@ -119,8 +159,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 /* ========== Responsive ========== */
 @media (max-width: 900px) {
     .detail-layout { grid-template-columns: 1fr; }
-    .detail-main { flex-direction: column; }
-    .detail-image { width: 100%; min-width: unset; height: 180px; }
+    .detail-field-grid { grid-template-columns: 1fr; }
     .stats-bar { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 600px) {
@@ -128,4 +167,5 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
     .form-row { grid-template-columns: 1fr; }
     .filters { flex-direction: column; }
     .filters input { min-width: unset; }
+    .header-url { display: none; }
 }

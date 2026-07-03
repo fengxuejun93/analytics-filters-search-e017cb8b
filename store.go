@@ -10,17 +10,20 @@ import (
 
 // Store 内存数据存储
 type Store struct {
-	mu           sync.RWMutex
-	items        map[string]*Item
-	applications map[string]*Application
-	itemSeq      int
-	appSeq       int
+	mu            sync.RWMutex
+	items         map[string]*Item
+	applications  map[string]*Application
+	history       map[string][]*StatusHistory
+	itemSeq       int
+	appSeq        int
+	historySeq    int
 }
 
 func NewStore() *Store {
 	s := &Store{
 		items:        make(map[string]*Item),
 		applications: make(map[string]*Application),
+		history:      make(map[string][]*StatusHistory),
 	}
 	s.seedData()
 	return s
@@ -98,9 +101,92 @@ func (s *Store) seedData() {
 		s.applications[apps[i].ID] = &apps[i]
 	}
 	s.appSeq = 5
+
+	// 种子历史记录
+	s.historySeq = 10
+	s.history["item-1"] = []*StatusHistory{
+		{ID: "h-1", ItemID: "item-1", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "张三", CreatedAt: time.Now().Add(-72 * time.Hour)},
+	}
+	s.history["item-2"] = []*StatusHistory{
+		{ID: "h-2", ItemID: "item-2", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "李四", CreatedAt: time.Now().Add(-48 * time.Hour)},
+		{ID: "h-3", ItemID: "item-2", FromStatus: "listed", ToStatus: "exchanged", Reason: "接受 郑三 的置换申请", Operator: "李四", CreatedAt: time.Now().Add(-10 * time.Hour)},
+	}
+	s.history["item-3"] = []*StatusHistory{
+		{ID: "h-4", ItemID: "item-3", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "王五", CreatedAt: time.Now().Add(-24 * time.Hour)},
+	}
+	s.history["item-4"] = []*StatusHistory{
+		{ID: "h-5", ItemID: "item-4", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "赵六", CreatedAt: time.Now().Add(-12 * time.Hour)},
+	}
+	s.history["item-5"] = []*StatusHistory{
+		{ID: "h-6", ItemID: "item-5", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "孙七", CreatedAt: time.Now().Add(-6 * time.Hour)},
+	}
+	s.history["item-6"] = []*StatusHistory{
+		{ID: "h-7", ItemID: "item-6", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "周八", CreatedAt: time.Now().Add(-120 * time.Hour)},
+		{ID: "h-8", ItemID: "item-6", FromStatus: "listed", ToStatus: "exchanged", Reason: "接受 何五 的置换申请", Operator: "周八", CreatedAt: time.Now().Add(-2 * time.Hour)},
+		{ID: "h-9", ItemID: "item-6", FromStatus: "exchanged", ToStatus: "delisted", Reason: "主动下架", Operator: "周八", CreatedAt: time.Now().Add(-1 * time.Hour)},
+	}
 }
 
 // ========== 货品操作 ==========
+
+// addHistory 记录状态变更历史（调用方需持有写锁）
+func (s *Store) addHistory(itemID, fromStatus, toStatus, reason, operator string) {
+	s.historySeq++
+	h := &StatusHistory{
+		ID:         fmt.Sprintf("h-%d", s.historySeq),
+		ItemID:     itemID,
+		FromStatus: fromStatus,
+		ToStatus:   toStatus,
+		Reason:     reason,
+		Operator:   operator,
+		CreatedAt:  time.Now(),
+	}
+	s.history[itemID] = append(s.history[itemID], h)
+}
+
+// GetStatusHistory 获取货品状态历史
+func (s *Store) GetStatusHistory(itemID string) []*StatusHistory {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.history[itemID]
+}
+
+// GetItemDetail 获取聚合详情
+func (s *Store) GetItemDetail(itemID string) (*ItemDetailResponse, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	item, ok := s.items[itemID]
+	if !ok {
+		return nil, false
+	}
+
+	var apps []*Application
+	for _, app := range s.applications {
+		if app.ItemID == itemID {
+			apps = append(apps, app)
+		}
+	}
+	sort.Slice(apps, func(i, j int) bool {
+		return apps[i].CreatedAt.After(apps[j].CreatedAt)
+	})
+
+	pendingCount := 0
+	for _, a := range apps {
+		if a.Status == AppStatusPending {
+			pendingCount++
+		}
+	}
+
+	history := s.history[itemID]
+
+	return &ItemDetailResponse{
+		Item:          item,
+		Applications:  apps,
+		StatusHistory: history,
+		PendingCount:  pendingCount,
+	}, true
+}
 
 func (s *Store) ListItems(filter FilterParams) []*Item {
 	s.mu.RLock()
@@ -165,6 +251,7 @@ func (s *Store) CreateItem(req ItemRequest) *Item {
 		UpdatedAt:        now,
 	}
 	s.items[item.ID] = item
+	s.addHistory(item.ID, "", "listed", "发布上架", req.Publisher)
 	return item
 }
 
@@ -196,8 +283,19 @@ func (s *Store) UpdateItemStatus(id string, status ItemStatus) (*Item, bool) {
 	if !ok {
 		return nil, false
 	}
+	oldStatus := string(item.Status)
 	item.Status = status
 	item.UpdatedAt = time.Now()
+	reasonMap := map[string]string{
+		"listed":   "重新上架/恢复上架",
+		"delisted": "主动下架",
+		"exchanged": "已达成置换",
+	}
+	reason := reasonMap[string(status)]
+	if reason == "" {
+		reason = fmt.Sprintf("状态变更为 %s", status)
+	}
+	s.addHistory(id, oldStatus, string(status), reason, item.Publisher)
 	return item, true
 }
 
@@ -272,8 +370,10 @@ func (s *Store) HandleApplication(appID string, action string) (*Application, er
 			app.Status = AppStatusAccepted
 			// 接受申请后，将货品标记为已置换
 			if item, ok := s.items[app.ItemID]; ok {
+				oldSt := string(item.Status)
 				item.Status = ItemStatusExchanged
 				item.UpdatedAt = time.Now()
+				s.addHistory(app.ItemID, oldSt, "exchanged", fmt.Sprintf("接受 %s 的置换申请", app.Applicant), item.Publisher)
 			}
 			// 拒绝该货品的其他待处理申请
 			for _, other := range s.applications {
@@ -294,8 +394,10 @@ func (s *Store) HandleApplication(appID string, action string) (*Application, er
 			app.Status = AppStatusCancelled
 			// 取消已接受的申请，恢复货品为上架中
 			if item, ok := s.items[app.ItemID]; ok {
+				oldSt := string(item.Status)
 				item.Status = ItemStatusListed
 				item.UpdatedAt = time.Now()
+				s.addHistory(app.ItemID, oldSt, "listed", fmt.Sprintf("取消 %s 的置换申请，恢复上架", app.Applicant), item.Publisher)
 			}
 		} else {
 			return nil, fmt.Errorf("已接受的申请只能取消，不能再次接受或拒绝")

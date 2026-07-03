@@ -10,7 +10,10 @@
     <header class="app-header">
         <div class="header-inner">
             <h1 class="logo" onclick="navigateTo('list')">🔄 二手置换平台</h1>
-            <button class="btn btn-primary" onclick="showCreateForm()">+ 发布货品</button>
+            <div class="header-right">
+                <span class="header-url" id="header-url"></span>
+                <button class="btn btn-primary" onclick="showCreateForm()">+ 发布货品</button>
+            </div>
         </div>
     </header>
 
@@ -25,7 +28,7 @@
     <!-- 列表视图 -->
     <main id="view-list" class="view active">
         <div class="filters">
-            <input type="text" id="filter-keyword" placeholder="搜索关键词..." oninput="loadItems()">
+            <input type="text" id="filter-keyword" placeholder="搜索关键词..." oninput="debounceLoadItems()">
             <select id="filter-category" onchange="loadItems()"><option value="">全部品类</option></select>
             <select id="filter-city" onchange="loadItems()"><option value="">全部城市</option></select>
             <select id="filter-status" onchange="loadItems()">
@@ -42,13 +45,22 @@
 
     <!-- 详情视图 -->
     <main id="view-detail" class="view">
-        <button class="btn btn-back" onclick="navigateTo('list')">← 返回列表</button>
+        <div class="detail-nav">
+            <button class="btn btn-back" onclick="navigateTo('list')">← 返回列表</button>
+            <span class="detail-nav-item" id="detail-nav-item"></span>
+        </div>
         <div class="detail-layout">
-            <div class="detail-main">
-                <div class="detail-image" id="detail-image">📷 图片占位</div>
-                <div class="detail-info">
-                    <h2 id="detail-title"></h2>
-                    <div class="detail-meta" id="detail-meta"></div>
+            <!-- 左栏：货品信息 -->
+            <div class="detail-col-left">
+                <div class="detail-card">
+                    <div class="detail-image" id="detail-image">📷</div>
+                    <div class="detail-info">
+                        <h2 id="detail-title"></h2>
+                        <div class="detail-meta" id="detail-meta"></div>
+                        <div class="detail-field-grid" id="detail-fields"></div>
+                    </div>
+                </div>
+                <div class="detail-card">
                     <div class="detail-section">
                         <h3>详细描述</h3>
                         <p id="detail-desc"></p>
@@ -58,17 +70,27 @@
                         <p id="detail-exchange"></p>
                     </div>
                     <div class="detail-actions" id="detail-actions"></div>
+                    <div class="detail-status-hint" id="detail-status-hint" style="display:none;"></div>
                 </div>
             </div>
-            <div class="detail-sidebar">
-                <div class="detail-section">
-                    <h3>置换申请 <button class="btn btn-sm" onclick="showApplyForm()" id="btn-apply-toggle">发起申请</button></h3>
-                    <div id="apply-form" class="apply-form" style="display:none;">
-                        <input type="text" id="apply-applicant" placeholder="你的名字">
-                        <textarea id="apply-message" placeholder="留言说明你能提供的置换物..."></textarea>
-                        <button class="btn btn-primary btn-sm" onclick="submitApplication()">提交申请</button>
+            <!-- 右栏：申请 + 状态历史 -->
+            <div class="detail-col-right">
+                <div class="detail-card">
+                    <div class="detail-section">
+                        <h3>置换申请 <span class="badge" id="detail-app-count">0</span> <button class="btn btn-sm btn-primary" onclick="showApplyForm()" id="btn-apply-toggle">发起申请</button></h3>
+                        <div id="apply-form" class="apply-form" style="display:none;">
+                            <input type="text" id="apply-applicant" placeholder="你的名字">
+                            <textarea id="apply-message" placeholder="留言说明你能提供的置换物..." rows="2"></textarea>
+                            <button class="btn btn-primary btn-sm" onclick="submitApplication()">提交申请</button>
+                        </div>
+                        <div id="application-list"></div>
                     </div>
-                    <div id="application-list"></div>
+                </div>
+                <div class="detail-card">
+                    <div class="detail-section">
+                        <h3>状态历史</h3>
+                        <div id="status-history"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -76,7 +98,9 @@
 
     <!-- 创建/编辑视图 -->
     <main id="view-form" class="view">
-        <button class="btn btn-back" onclick="navigateTo('list')">← 返回列表</button>
+        <div class="detail-nav">
+            <button class="btn btn-back" id="form-back-btn">← 返回</button>
+        </div>
         <div class="form-container">
             <h2 id="form-title">发布新货品</h2>
             <form id="item-form" onsubmit="submitItemForm(event)">
@@ -134,7 +158,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">保存</button>
-                    <button type="button" class="btn btn-secondary" onclick="navigateTo('list')">取消</button>
+                    <button type="button" class="btn btn-secondary" id="form-cancel-btn">取消</button>
                 </div>
             </form>
         </div>

@@ -47,6 +47,22 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request, id string) {
 	writeJSON(w, http.StatusOK, item)
 }
 
+// GET /api/items/{id}/detail (聚合详情)
+func (h *Handler) GetItemDetail(w http.ResponseWriter, r *http.Request, id string) {
+	detail, ok := h.store.GetItemDetail(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "货品不存在")
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+// GET /api/items/{id}/history
+func (h *Handler) GetStatusHistory(w http.ResponseWriter, r *http.Request, itemID string) {
+	history := h.store.GetStatusHistory(itemID)
+	writeJSON(w, http.StatusOK, history)
+}
+
 // POST /api/items
 func (h *Handler) CreateItem(w http.ResponseWriter, r *http.Request) {
 	var req ItemRequest
@@ -190,6 +206,18 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			case "status":
 				if r.Method == http.MethodPut {
 					h.UpdateItemStatus(w, r, itemID)
+				} else {
+					writeError(w, http.StatusMethodNotAllowed, "方法不允许")
+				}
+			case "detail":
+				if r.Method == http.MethodGet {
+					h.GetItemDetail(w, r, itemID)
+				} else {
+					writeError(w, http.StatusMethodNotAllowed, "方法不允许")
+				}
+			case "history":
+				if r.Method == http.MethodGet {
+					h.GetStatusHistory(w, r, itemID)
 				} else {
 					writeError(w, http.StatusMethodNotAllowed, "方法不允许")
 				}
