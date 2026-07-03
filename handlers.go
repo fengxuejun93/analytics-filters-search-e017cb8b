@@ -33,8 +33,8 @@ func (h *Handler) ListItems(w http.ResponseWriter, r *http.Request) {
 		City:     r.URL.Query().Get("city"),
 		Status:   r.URL.Query().Get("status"),
 	}
-	items := h.store.ListItems(filter)
-	writeJSON(w, http.StatusOK, items)
+	result := h.store.ListItemsWithTotal(filter)
+	writeJSON(w, http.StatusOK, result)
 }
 
 // GET /api/items/{id}

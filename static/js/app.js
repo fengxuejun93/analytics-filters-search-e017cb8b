@@ -51,7 +51,6 @@ const statusMap = {
     pending: '待处理', accepted: '已接受', rejected: '已拒绝', cancelled: '已取消',
 };
 
-// 状态历史事件图标
 const historyIcons = {
     '发布上架': '🟢',
     '编辑货品信息': '✏️',
@@ -82,7 +81,7 @@ function debounceLoadItems() {
     debounceTimer = setTimeout(loadItems, 300);
 }
 
-// ========== 全量刷新（保证列表/详情/统计一致） ==========
+// ========== 全量刷新 ==========
 async function refreshAll() {
     await loadStats();
     if (currentView === 'detail' && currentItemId) {
@@ -118,7 +117,28 @@ async function loadStats() {
         document.getElementById('stat-pending').textContent = stats.pending_count;
         document.getElementById('stat-exchanged').textContent = stats.exchanged_count;
         document.getElementById('stat-delisted').textContent = stats.delisted_count;
+        document.getElementById('stat-rejected').textContent = stats.rejected_count;
+        document.getElementById('stat-cancelled').textContent = stats.cancelled_count;
     } catch (e) { console.error(e); }
+}
+
+// ========== 统计项点击筛选 ==========
+function filterByStat(status) {
+    // 返回列表视图并按状态筛选
+    currentView = 'list';
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-list').classList.add('active');
+    currentItemId = null;
+    currentItem = null;
+
+    // 设置筛选
+    document.getElementById('filter-keyword').value = '';
+    document.getElementById('filter-category').value = '';
+    document.getElementById('filter-city').value = '';
+    document.getElementById('filter-status').value = status;
+
+    loadItems();
+    loadStats();
 }
 
 // ========== 筛选器选项 ==========
@@ -164,6 +184,13 @@ function clearFilters() {
     loadItems();
 }
 
+function hasActiveFilters() {
+    return !!document.getElementById('filter-keyword').value.trim() ||
+           !!document.getElementById('filter-category').value ||
+           !!document.getElementById('filter-city').value ||
+           !!document.getElementById('filter-status').value;
+}
+
 // ========== 货品列表 ==========
 async function loadItems() {
     const params = new URLSearchParams();
@@ -177,9 +204,22 @@ async function loadItems() {
     if (status) params.set('status', status);
 
     try {
-        const items = await api('/items?' + params.toString());
+        const resp = await api('/items?' + params.toString());
+        const items = resp.items || resp;  // 兼容新旧格式
+        const totalCount = resp.total_count || items.length;
+        const filteredCount = items.length;
+
         const grid = document.getElementById('item-grid');
         const empty = document.getElementById('empty-state');
+        const resultCount = document.getElementById('result-count');
+
+        // 结果计数：筛选时显示 N/M
+        if (hasActiveFilters() && totalCount > 0) {
+            resultCount.textContent = `当前结果: ${filteredCount} / 全部: ${totalCount}`;
+            resultCount.style.display = 'block';
+        } else {
+            resultCount.style.display = 'none';
+        }
 
         if (!items.length) {
             grid.innerHTML = '';
@@ -216,7 +256,7 @@ function openDetail(itemId) {
     navigateTo('detail', itemId);
 }
 
-// ========== 货品详情（聚合接口） ==========
+// ========== 货品详情 ==========
 async function loadDetail(itemId) {
     try {
         const detail = await api('/items/' + itemId + '/detail');
@@ -292,7 +332,6 @@ function renderDetailActions(item) {
 
 // ========== 置换申请渲染 ==========
 function renderApplications(apps, item) {
-    // 计算待处理数
     const pendingCount = apps.filter(a => a.status === 'pending').length;
     document.getElementById('detail-app-count').textContent = pendingCount;
     document.getElementById('detail-app-count').title = `共 ${apps.length} 条申请，${pendingCount} 条待处理`;
@@ -314,17 +353,14 @@ function renderApplications(apps, item) {
         let actionBtns = '';
 
         if (a.status === 'pending' && item.status === 'listed') {
-            // 货品上架中 + 申请待处理 → 可接受/拒绝/取消
             actionBtns = `
                 <button class="btn btn-sm btn-success" onclick="handleApp('${a.id}','accept')">接受</button>
                 <button class="btn btn-sm btn-danger" onclick="handleApp('${a.id}','reject')">拒绝</button>
                 <button class="btn btn-sm btn-secondary" onclick="handleApp('${a.id}','cancel')">取消</button>
             `;
         } else if (a.status === 'accepted') {
-            // 已接受 → 可取消置换
             actionBtns = `<button class="btn btn-sm btn-warning" onclick="handleApp('${a.id}','cancel')">取消置换</button>`;
         } else if (a.status === 'pending' && item.status !== 'listed') {
-            // 申请待处理但货品已不在上架状态
             actionBtns = `<span class="op-hint">货品已${statusMap[item.status]}，此申请暂不可操作</span>`;
         } else if (a.status === 'rejected') {
             actionBtns = `<span class="op-hint">已拒绝，不可操作</span>`;
@@ -403,7 +439,6 @@ async function submitApplication() {
         document.getElementById('apply-offer-item').value = '';
         document.getElementById('apply-message').value = '';
         document.getElementById('apply-form').style.display = 'none';
-        // 全量刷新
         refreshAll();
     } catch (e) { showToast(e.message, 'error'); }
 }
@@ -416,7 +451,6 @@ async function handleApp(appId, action) {
         });
         const actionLabels = { accept: '已接受', reject: '已拒绝', cancel: '已取消' };
         showToast(actionLabels[action] || '操作成功');
-        // 全量刷新：详情（含申请+历史）+ 统计
         refreshAll();
     } catch (e) { showToast(e.message, 'error'); }
 }
@@ -500,7 +534,7 @@ async function submitItemForm(e) {
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
     const urlEl = document.getElementById('header-url');
-    urlEl.textContent = window.location.origin + '  ← 当前访问入口';
+    urlEl.textContent = window.location.origin + '  ← 访问入口';
 
     loadFilterOptions();
     loadItems();

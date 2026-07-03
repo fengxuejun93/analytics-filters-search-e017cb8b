@@ -62,12 +62,20 @@ type Application struct {
 
 // 统计数据
 type Stats struct {
-	ListedCount    int `json:"listed_count"`
-	PendingCount   int `json:"pending_count"`
-	ExchangedCount int `json:"exchanged_count"`
-	DelistedCount  int `json:"delisted_count"`
-	TotalItems     int `json:"total_items"`
-	TotalApps      int `json:"total_apps"`
+	ListedCount     int `json:"listed_count"`
+	PendingCount    int `json:"pending_count"`
+	ExchangedCount  int `json:"exchanged_count"`
+	DelistedCount   int `json:"delisted_count"`
+	RejectedCount   int `json:"rejected_count"`
+	CancelledCount  int `json:"cancelled_count"`
+	TotalItems      int `json:"total_items"`
+	TotalApps       int `json:"total_apps"`
+}
+
+// 列表响应（含筛选结果数和全部总数）
+type ItemListResponse struct {
+	Items      []*Item `json:"items"`
+	TotalCount int     `json:"total_count"`
 }
 
 // 创建/编辑货品请求

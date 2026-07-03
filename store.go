@@ -451,11 +451,54 @@ func (s *Store) GetStats() Stats {
 		}
 	}
 	for _, app := range s.applications {
-		if app.Status == AppStatusPending {
+		switch app.Status {
+		case AppStatusPending:
 			stats.PendingCount++
+		case AppStatusRejected:
+			stats.RejectedCount++
+		case AppStatusCancelled:
+			stats.CancelledCount++
 		}
 	}
 	return stats
+}
+
+// ListItemsWithTotal 返回筛选结果和全部货品数
+func (s *Store) ListItemsWithTotal(filter FilterParams) *ItemListResponse {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	totalCount := len(s.items)
+	var result []*Item
+	for _, item := range s.items {
+		if filter.Keyword != "" {
+			kw := strings.ToLower(filter.Keyword)
+			if !strings.Contains(strings.ToLower(item.Title), kw) &&
+				!strings.Contains(strings.ToLower(item.Description), kw) &&
+				!strings.Contains(strings.ToLower(item.ExpectedExchange), kw) {
+				continue
+			}
+		}
+		if filter.Category != "" && item.Category != filter.Category {
+			continue
+		}
+		if filter.City != "" && item.City != filter.City {
+			continue
+		}
+		if filter.Status != "" && string(item.Status) != filter.Status {
+			continue
+		}
+		result = append(result, item)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].UpdatedAt.After(result[j].UpdatedAt)
+	})
+
+	return &ItemListResponse{
+		Items:      result,
+		TotalCount: totalCount,
+	}
 }
 
 // 获取所有品类
