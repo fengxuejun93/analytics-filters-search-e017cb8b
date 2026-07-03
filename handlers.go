@@ -85,9 +85,13 @@ func (h *Handler) UpdateItem(w http.ResponseWriter, r *http.Request, id string) 
 		writeError(w, http.StatusBadRequest, "请求格式错误")
 		return
 	}
-	item, ok := h.store.UpdateItem(id, req)
-	if !ok {
-		writeError(w, http.StatusNotFound, "货品不存在")
+	if req.Title == "" || req.Category == "" || req.Publisher == "" {
+		writeError(w, http.StatusBadRequest, "标题、品类、发布人为必填项")
+		return
+	}
+	item, err := h.store.UpdateItem(id, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, item)
@@ -102,9 +106,9 @@ func (h *Handler) UpdateItemStatus(w http.ResponseWriter, r *http.Request, id st
 		writeError(w, http.StatusBadRequest, "请求格式错误")
 		return
 	}
-	item, ok := h.store.UpdateItemStatus(id, ItemStatus(body.Status))
-	if !ok {
-		writeError(w, http.StatusNotFound, "货品不存在")
+	item, err := h.store.UpdateItemStatus(id, ItemStatus(body.Status))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, item)

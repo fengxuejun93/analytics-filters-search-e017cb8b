@@ -259,13 +259,16 @@ func (s *Store) CreateItem(req ItemRequest) *Item {
 	return item
 }
 
-func (s *Store) UpdateItem(id string, req ItemRequest) (*Item, bool) {
+func (s *Store) UpdateItem(id string, req ItemRequest) (*Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	item, ok := s.items[id]
 	if !ok {
-		return nil, false
+		return nil, fmt.Errorf("货品不存在")
+	}
+	if item.Status == ItemStatusExchanged {
+		return nil, fmt.Errorf("已置换的货品不可编辑，请先取消置换申请")
 	}
 	item.Title = req.Title
 	item.Category = req.Category
@@ -277,23 +280,36 @@ func (s *Store) UpdateItem(id string, req ItemRequest) (*Item, bool) {
 	item.ImageURL = req.ImageURL
 	item.UpdatedAt = time.Now()
 	s.addHistory(id, string(item.Status), string(item.Status), "编辑货品信息", req.Publisher)
-	return item, true
+	return item, nil
 }
 
-func (s *Store) UpdateItemStatus(id string, status ItemStatus) (*Item, bool) {
+func (s *Store) UpdateItemStatus(id string, status ItemStatus) (*Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	item, ok := s.items[id]
 	if !ok {
-		return nil, false
+		return nil, fmt.Errorf("货品不存在")
+	}
+	// 状态转换校验
+	if item.Status == ItemStatusExchanged && status == ItemStatusDelisted {
+		return nil, fmt.Errorf("已置换的货品不可下架，请先取消置换申请")
+	}
+	if item.Status == ItemStatusExchanged && status == ItemStatusListed {
+		return nil, fmt.Errorf("已置换的货品不可直接重新上架，请先取消置换申请")
+	}
+	if item.Status == ItemStatusListed && status == ItemStatusListed {
+		return nil, fmt.Errorf("货品已是上架状态")
+	}
+	if item.Status == ItemStatusDelisted && status == ItemStatusDelisted {
+		return nil, fmt.Errorf("货品已是下架状态")
 	}
 	oldStatus := string(item.Status)
 	item.Status = status
 	item.UpdatedAt = time.Now()
 	reasonMap := map[string]string{
-		"listed":   "重新上架/恢复上架",
-		"delisted": "主动下架",
+		"listed":    "重新上架/恢复上架",
+		"delisted":  "主动下架",
 		"exchanged": "已达成置换",
 	}
 	reason := reasonMap[string(status)]
@@ -301,7 +317,7 @@ func (s *Store) UpdateItemStatus(id string, status ItemStatus) (*Item, bool) {
 		reason = fmt.Sprintf("状态变更为 %s", status)
 	}
 	s.addHistory(id, oldStatus, string(status), reason, item.Publisher)
-	return item, true
+	return item, nil
 }
 
 // ========== 置换申请操作 ==========
@@ -342,6 +358,12 @@ func (s *Store) CreateApplication(itemID string, req ApplicationRequest) (*Appli
 	}
 	if item.Status != ItemStatusListed {
 		return nil, fmt.Errorf("该货品当前状态不允许发起申请")
+	}
+	// 防重复：同一申请人对同一货品不可重复发起待处理申请
+	for _, existing := range s.applications {
+		if existing.ItemID == itemID && existing.Applicant == req.Applicant && existing.Status == AppStatusPending {
+			return nil, fmt.Errorf("你已对该货品发起过待处理的申请，请勿重复提交")
+		}
 	}
 
 	s.appSeq++
