@@ -67,12 +67,24 @@ func (s *Store) seedData() {
 			Status: ItemStatusDelisted, Description: "Sony 头戴式降噪耳机，黑色，降噪效果极佳，配件齐全。已与别人达成置换，下架处理。",
 			ImageURL: "", CreatedAt: time.Now().Add(-120 * time.Hour), UpdatedAt: time.Now().Add(-2 * time.Hour),
 		},
+		{
+			ID: "item-7", Title: "Kindle Oasis 电子阅读器", Category: "数码电子", Condition: "九五新",
+			City: "成都", ExpectedExchange: "iPad Mini 或索尼降噪耳机", Publisher: "陈一",
+			Status: ItemStatusListed, Description: "Kindle Oasis 第三代，7寸屏幕，32GB，含原装皮套。轻度使用，屏幕无划痕。希望换 iPad Mini 或索尼降噪耳机。",
+			ImageURL: "", CreatedAt: time.Now().Add(-18 * time.Hour), UpdatedAt: time.Now().Add(-18 * time.Hour),
+		},
+		{
+			ID: "item-8", Title: "迪卡侬瑜伽垫+弹力带套装", Category: "运动户外", Condition: "全新",
+			City: "上海", ExpectedExchange: "哑铃或跳绳", Publisher: "赵六",
+			Status: ItemStatusListed, Description: "迪卡侬瑜伽垫加三根弹力带，全新未拆封，买重复了。希望换哑铃或跳绳。",
+			ImageURL: "", CreatedAt: time.Now().Add(-3 * time.Hour), UpdatedAt: time.Now().Add(-3 * time.Hour),
+		},
 	}
 
 	for i := range items {
 		s.items[items[i].ID] = &items[i]
 	}
-	s.itemSeq = 6
+	s.itemSeq = 8
 
 	apps := []Application{
 		{
@@ -95,12 +107,20 @@ func (s *Store) seedData() {
 			ID: "app-5", ItemID: "item-6", Applicant: "何五", OfferItem: "AirPods Pro 2代", Message: "AirPods Pro 2代可以换。",
 			Status: AppStatusAccepted, CreatedAt: time.Now().Add(-96 * time.Hour), UpdatedAt: time.Now().Add(-2 * time.Hour),
 		},
+		{
+			ID: "app-6", ItemID: "item-5", Applicant: "张三", OfferItem: "机械键盘 Cherry 红轴", Message: "有一把 Cherry 红轴机械键盘，八成新，想换书看。",
+			Status: AppStatusPending, CreatedAt: time.Now().Add(-5 * time.Hour), UpdatedAt: time.Now().Add(-5 * time.Hour),
+		},
+		{
+			ID: "app-7", ItemID: "item-7", Applicant: "吴二", OfferItem: "索尼 WH-CH720N 降噪耳机", Message: "有一副索尼 WH-CH720N，轻便好用，可以换吗？",
+			Status: AppStatusPending, CreatedAt: time.Now().Add(-10 * time.Hour), UpdatedAt: time.Now().Add(-10 * time.Hour),
+		},
 	}
 
 	for i := range apps {
 		s.applications[apps[i].ID] = &apps[i]
 	}
-	s.appSeq = 5
+	s.appSeq = 7
 
 	// 种子历史记录
 	s.historySeq = 10
@@ -128,6 +148,17 @@ func (s *Store) seedData() {
 		{ID: "h-7", ItemID: "item-6", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "周八", CreatedAt: time.Now().Add(-120 * time.Hour)},
 		{ID: "h-8", ItemID: "item-6", FromStatus: "listed", ToStatus: "exchanged", Reason: "接受 何五 的置换申请", Operator: "周八", CreatedAt: time.Now().Add(-2 * time.Hour)},
 		{ID: "h-9", ItemID: "item-6", FromStatus: "exchanged", ToStatus: "delisted", Reason: "主动下架", Operator: "周八", CreatedAt: time.Now().Add(-1 * time.Hour)},
+	}
+	s.history["item-7"] = []*StatusHistory{
+		{ID: "h-10", ItemID: "item-7", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "陈一", CreatedAt: time.Now().Add(-18 * time.Hour)},
+		{ID: "h-10a", ItemID: "item-7", FromStatus: "listed", ToStatus: "listed", Reason: "吴二 发起置换申请（提供: 索尼 WH-CH720N 降噪耳机）", Operator: "吴二", CreatedAt: time.Now().Add(-10 * time.Hour)},
+	}
+	s.history["item-8"] = []*StatusHistory{
+		{ID: "h-11", ItemID: "item-8", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "赵六", CreatedAt: time.Now().Add(-3 * time.Hour)},
+	}
+	s.history["item-5"] = []*StatusHistory{
+		{ID: "h-6", ItemID: "item-5", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "孙七", CreatedAt: time.Now().Add(-6 * time.Hour)},
+		{ID: "h-6a", ItemID: "item-5", FromStatus: "listed", ToStatus: "listed", Reason: "张三 发起置换申请（提供: 机械键盘 Cherry 红轴）", Operator: "张三", CreatedAt: time.Now().Add(-5 * time.Hour)},
 	}
 }
 
@@ -284,6 +315,10 @@ func (s *Store) UpdateItem(id string, req ItemRequest) (*Item, error) {
 }
 
 func (s *Store) UpdateItemStatus(id string, status ItemStatus) (*Item, error) {
+	return s.UpdateItemStatusWithOperator(id, status, "操作者", "")
+}
+
+func (s *Store) UpdateItemStatusWithOperator(id string, status ItemStatus, operator string, role string) (*Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -316,7 +351,14 @@ func (s *Store) UpdateItemStatus(id string, status ItemStatus) (*Item, error) {
 	if reason == "" {
 		reason = fmt.Sprintf("状态变更为 %s", status)
 	}
-	s.addHistory(id, oldStatus, string(status), reason, item.Publisher)
+	if role == "admin" {
+		if status == ItemStatusDelisted {
+			reason = "强制下架"
+		} else if status == ItemStatusListed && oldStatus == "delisted" {
+			reason = "管理员恢复上架"
+		}
+	}
+	s.addHistory(id, oldStatus, string(status), reason, operator)
 	return item, nil
 }
 

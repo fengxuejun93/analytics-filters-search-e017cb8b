@@ -102,13 +102,19 @@ func (h *Handler) UpdateItem(w http.ResponseWriter, r *http.Request, id string) 
 // PUT /api/items/{id}/status
 func (h *Handler) UpdateItemStatus(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
-		Status string `json:"status"`
+		Status   string `json:"status"`
+		Operator string `json:"operator"`
+		Role     string `json:"role"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "请求格式错误")
 		return
 	}
-	item, err := h.store.UpdateItemStatus(id, ItemStatus(body.Status))
+	operator := body.Operator
+	if operator == "" {
+		operator = "操作者"
+	}
+	item, err := h.store.UpdateItemStatusWithOperator(id, ItemStatus(body.Status), operator, body.Role)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

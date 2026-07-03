@@ -5,8 +5,93 @@ let currentItemId = null;
 let savedFilters = {};
 let filterOptions = null;
 let debounceTimer = null;
-let loadingLock = {};  // 防重复提交锁
-let cachedFilteredItems = []; // 缓存当前筛选结果列表
+let loadingLock = {};
+let cachedFilteredItems = [];
+
+// ========== 角色系统 ==========
+const ROLES = {
+    guest:     { label: '游客',       user: null,   badge: 'role-badge-guest' },
+    publisher: { label: '发布人',      user: '张三', badge: 'role-badge-publisher' },
+    applicant: { label: '申请人',      user: '陈一', badge: 'role-badge-applicant' },
+    admin:     { label: '平台管理员',  user: '管理员', badge: 'role-badge-admin' },
+};
+let currentRole = 'publisher'; // 默认发布人
+
+function getRole() { return currentRole; }
+function getRoleUser() { return ROLES[currentRole].user; }
+function getRoleLabel() { return ROLES[currentRole].label; }
+function isOwnItem(item) { const u = getRoleUser(); return u && item.publisher === u; }
+function isOwnApp(app) { const u = getRoleUser(); return u && app.applicant === u; }
+
+// 权限检查
+function canCreateItem() { return currentRole === 'publisher' || currentRole === 'admin'; }
+function canEditItem(item) {
+    if (currentRole === 'admin') return item.status !== 'exchanged';
+    if (currentRole === 'publisher') return isOwnItem(item) && item.status !== 'exchanged';
+    return false;
+}
+function canDelistItem(item) {
+    if (currentRole === 'admin') return item.status === 'listed';
+    if (currentRole === 'publisher') return isOwnItem(item) && item.status === 'listed';
+    return false;
+}
+function canRelistItem(item) {
+    if (currentRole === 'admin') return item.status === 'delisted';
+    if (currentRole === 'publisher') return isOwnItem(item) && item.status === 'delisted';
+    return false;
+}
+function canApplyToItem(item) {
+    if (currentRole !== 'applicant' && currentRole !== 'admin') return false;
+    if (item.status !== 'listed') return false;
+    return true;
+}
+function canHandleApp(app, item) {
+    // 接受/拒绝：发布人处理自己货品的待处理申请，管理员可处理任何待处理申请
+    if (app.status !== 'pending') return false;
+    if (currentRole === 'admin') return true;
+    if (currentRole === 'publisher' && isOwnItem(item)) return true;
+    return false;
+}
+function canCancelApp(app, item) {
+    // 取消待处理申请：申请人取消自己的申请；发布人取消自己货品上的待处理申请；管理员可取消任何
+    if (app.status === 'pending') {
+        if (currentRole === 'admin') return true;
+        if (currentRole === 'applicant' && isOwnApp(app)) return true;
+        if (currentRole === 'publisher' && isOwnItem(item)) return true;
+    }
+    // 取消已接受的申请（恢复货品为上架）
+    if (app.status === 'accepted') {
+        if (currentRole === 'admin') return true;
+        if (currentRole === 'publisher' && isOwnItem(item)) return true;
+    }
+    return false;
+}
+function canForceDelist(item) {
+    // 管理员强制下架（不管是不是自己的）
+    return currentRole === 'admin' && item.status === 'listed';
+}
+function canForceRestore(item) {
+    // 管理员恢复上架（不管是不是自己的）
+    return currentRole === 'admin' && item.status === 'delisted';
+}
+
+// 角色切换
+function switchRole(role) {
+    currentRole = role;
+    // 更新发布按钮可见性
+    document.getElementById('btn-create-item').style.display = canCreateItem() ? '' : 'none';
+    // 如果当前在详情视图，重新渲染详情以更新按钮
+    if (currentView === 'detail' && currentItem) {
+        loadDetail(currentItem.id);
+    } else if (currentView === 'list') {
+        loadItems();
+    }
+    // 如果在表单视图，回到列表
+    if (currentView === 'form') {
+        navigateTo('list');
+    }
+    showToast(`已切换为 ${getRoleLabel()}${getRoleUser() ? ' (' + getRoleUser() + ')' : ''}`, 'info');
+}
 
 // ========== 工具函数 ==========
 const API = '/api';
@@ -80,7 +165,7 @@ const statusMap = {
 };
 const statusLabel = (s) => statusMap[s] || s || '未知';
 
-const historyIcons = { '发布上架': '🟢', '编辑货品信息': '✏️', '主动下架': '🔴', '重新上架/恢复上架': '🔄' };
+const historyIcons = { '发布上架': '🟢', '编辑货品信息': '✏️', '主动下架': '🔴', '重新上架/恢复上架': '🔄', '强制下架': '🔴', '管理员恢复上架': '🔄' };
 function historyIcon(reason) {
     for (const [key, icon] of Object.entries(historyIcons)) { if (reason && reason.includes(key)) return icon; }
     if (reason && reason.includes('发起置换申请')) return '📋';
@@ -150,14 +235,12 @@ async function loadStats() {
 }
 
 function filterByStat(status) {
-    // pending/rejected/cancelled 是申请维度 → 使用申请状态筛选
     if (status === 'pending' || status === 'rejected' || status === 'cancelled') {
         currentView = 'list';
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById('view-list').classList.add('active');
         currentItemId = null;
         currentItem = null;
-        // 清除其他筛选，设置申请状态
         document.getElementById('filter-keyword').value = '';
         document.getElementById('filter-category').value = '';
         document.getElementById('filter-city').value = '';
@@ -239,19 +322,12 @@ function clearFilters() {
 }
 
 function clearSingleFilter(field) {
-    if (field === 'keyword') {
-        document.getElementById('filter-keyword').value = '';
-    } else if (field === 'category') {
-        document.getElementById('filter-category').value = '';
-    } else if (field === 'city') {
-        document.getElementById('filter-city').value = '';
-    } else if (field === 'condition') {
-        document.getElementById('filter-condition').value = '';
-    } else if (field === 'status') {
-        document.getElementById('filter-status').value = '';
-    } else if (field === 'app_status') {
-        document.getElementById('filter-app-status').value = '';
-    }
+    if (field === 'keyword') document.getElementById('filter-keyword').value = '';
+    else if (field === 'category') document.getElementById('filter-category').value = '';
+    else if (field === 'city') document.getElementById('filter-city').value = '';
+    else if (field === 'condition') document.getElementById('filter-condition').value = '';
+    else if (field === 'status') document.getElementById('filter-status').value = '';
+    else if (field === 'app_status') document.getElementById('filter-app-status').value = '';
     loadItems();
 }
 
@@ -260,20 +336,11 @@ function hasActiveFilters() {
     return !!f.keyword || !!f.category || !!f.city || !!f.condition || !!f.status || !!f.app_status;
 }
 
-// 渲染激活的筛选标签
 function renderActiveFilterTags() {
     const container = document.getElementById('active-filters');
     const f = getFilterValues();
     const tags = [];
-
-    const labelMap = {
-        keyword: '关键词',
-        category: '品类',
-        city: '城市',
-        condition: '成色',
-        status: '货品状态',
-        app_status: '申请状态',
-    };
+    const labelMap = { keyword: '关键词', category: '品类', city: '城市', condition: '成色', status: '货品状态', app_status: '申请状态' };
 
     for (const [key, label] of Object.entries(labelMap)) {
         const val = f[key];
@@ -307,10 +374,8 @@ async function loadItems() {
     const empty = document.getElementById('empty-state');
     const resultCount = document.getElementById('result-count');
 
-    // 渲染筛选标签
     renderActiveFilterTags();
 
-    // 重置空状态为默认内容
     function resetEmptyState() {
         empty.innerHTML = '<p>暂无符合条件的货品</p><button class="btn btn-secondary btn-sm" onclick="clearFilters()" style="margin-top:8px;">清除筛选，查看全部</button>';
     }
@@ -319,15 +384,10 @@ async function loadItems() {
         const resp = await api('/items?' + params.toString());
         const items = resp.items || (Array.isArray(resp) ? resp : []);
         const totalCount = resp.total_count ?? items.length;
-
-        // 缓存筛选结果
         cachedFilteredItems = items;
 
-        if (hasActiveFilters() && totalCount > 0) {
+        if (hasActiveFilters()) {
             resultCount.textContent = `当前结果: ${items.length} / 全部: ${totalCount}`;
-            resultCount.style.display = 'block';
-        } else if (hasActiveFilters() && totalCount === 0) {
-            resultCount.textContent = `当前结果: 0 / 全部: ${totalCount}`;
             resultCount.style.display = 'block';
         } else {
             resultCount.style.display = 'none';
@@ -340,15 +400,19 @@ async function loadItems() {
             return;
         }
         empty.style.display = 'none';
-        grid.innerHTML = items.map(item => `
+
+        grid.innerHTML = items.map(item => {
+            const own = isOwnItem(item);
+            return `
             <div class="item-card ${currentItemId === item.id ? 'item-card-active' : ''}" onclick="openDetail('${esc(item.id)}')">
-                <div class="item-card-image">📷</div>
+                <div class="item-card-image">📷${own ? '<span class="own-badge">自己的</span>' : ''}</div>
                 <div class="item-card-body">
                     <div class="item-card-title">${esc(item.title || '无标题')}</div>
                     <div class="item-card-tags">
                         <span class="tag tag-category">${esc(item.category || '未分类')}</span>
                         <span class="tag tag-condition">${esc(item.condition || '未填写')}</span>
                         <span class="tag tag-city">${esc(item.city || '未填写')}</span>
+                        ${own ? '<span class="tag tag-own">我的货品</span>' : ''}
                     </div>
                     <div class="item-card-bottom">
                         <span class="item-card-exchange">期望: ${esc(item.expected_exchange || '不限')}</span>
@@ -359,8 +423,8 @@ async function loadItems() {
                         <span>${formatTime(item.updated_at)}</span>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     } catch (e) {
         grid.innerHTML = '';
         resultCount.style.display = 'none';
@@ -385,7 +449,6 @@ async function loadDetail(itemId) {
         renderDetail(detail);
     } catch (e) {
         showToast(e.message, 'error');
-        const nav = document.querySelector('.detail-nav');
         const errorHtml = `<div class="detail-error"><p>加载详情失败: ${esc(e.message)}</p><button class="btn btn-primary btn-sm" onclick="loadDetail('${esc(itemId)}')">重新加载</button> <button class="btn btn-secondary btn-sm" onclick="navigateTo('list')">返回列表</button></div>`;
         if (container) container.innerHTML = errorHtml;
     }
@@ -397,7 +460,7 @@ function renderDetail(detail) {
     const history = detail.status_history || [];
 
     document.getElementById('detail-nav-item').textContent = item.title || '货品详情';
-    document.getElementById('detail-image').textContent = '📷';
+    document.getElementById('detail-image').innerHTML = '📷' + (isOwnItem(item) ? '<span class="own-badge">自己的</span>' : '');
     document.getElementById('detail-title').textContent = item.title || '无标题';
 
     document.getElementById('detail-meta').innerHTML = `
@@ -405,6 +468,7 @@ function renderDetail(detail) {
         <span class="tag tag-condition">${esc(item.condition || '未填写')}</span>
         <span class="tag tag-city">${esc(item.city || '未填写')}</span>
         <span class="status-badge status-${item.status || 'listed'}">${statusLabel(item.status)}</span>
+        ${isOwnItem(item) ? '<span class="tag tag-own">我的货品</span>' : ''}
     `;
 
     document.getElementById('detail-fields').innerHTML = `
@@ -430,22 +494,59 @@ function renderDetailActions(item) {
     const hint = document.getElementById('detail-status-hint');
     let btns = '';
     let hintText = '';
+    const role = getRole();
 
-    switch (item.status) {
-        case 'listed':
+    // 根据角色和货品状态决定操作按钮
+    if (role === 'guest') {
+        // 游客无任何操作按钮
+        hintText = `当前为游客角色，仅可浏览和筛选。如需操作请切换角色。`;
+    } else if (role === 'publisher') {
+        if (isOwnItem(item)) {
+            if (item.status === 'listed') {
+                btns += `<button class="btn btn-sm btn-primary" onclick="showEditForm('${item.id}')">编辑</button>`;
+                btns += `<button class="btn btn-sm btn-secondary" onclick="delistItem('${item.id}')">下架</button>`;
+            } else if (item.status === 'delisted') {
+                btns += `<button class="btn btn-sm btn-success" onclick="relistItem('${item.id}')">重新上架</button>`;
+                btns += `<button class="btn btn-sm btn-primary" onclick="showEditForm('${item.id}')">编辑</button>`;
+                hintText = '此货品已下架，无法发起新的置换申请。可重新上架或编辑信息。';
+            } else if (item.status === 'exchanged') {
+                hintText = '此货品已达成置换，不可编辑或下架。如需恢复，请取消已接受的置换申请。';
+            }
+        } else {
+            // 别人的货品
+            if (item.status === 'listed') {
+                hintText = `这是 ${esc(item.publisher)} 发布的货品，发布人角色不能对别人的货品发起申请。如需申请请切换为申请人角色。`;
+            } else if (item.status === 'exchanged') {
+                hintText = '此货品已达成置换。';
+            } else if (item.status === 'delisted') {
+                hintText = '此货品已下架。';
+            }
+        }
+    } else if (role === 'applicant') {
+        if (item.status === 'listed') {
+            // 申请人可以发起申请
+            btns += `<button class="btn btn-sm btn-primary" onclick="showApplyForm()">发起申请</button>`;
+            if (isOwnItem(item)) {
+                hintText = '这是你自己发布的货品，申请人角色不能编辑或下架自己的货品。如需管理请切换为发布人角色。';
+            }
+        } else if (item.status === 'exchanged') {
+            hintText = '此货品已达成置换，无法再发起申请。';
+        } else if (item.status === 'delisted') {
+            hintText = '此货品已下架，无法发起申请。';
+        }
+    } else if (role === 'admin') {
+        if (item.status === 'listed') {
             btns += `<button class="btn btn-sm btn-primary" onclick="showEditForm('${item.id}')">编辑</button>`;
-            btns += `<button class="btn btn-sm btn-secondary" onclick="delistItem('${item.id}')">下架</button>`;
-            break;
-        case 'delisted':
-            btns += `<button class="btn btn-sm btn-success" onclick="relistItem('${item.id}')">重新上架</button>`;
+            btns += `<button class="btn btn-sm btn-secondary" onclick="delistItem('${item.id}')">强制下架</button>`;
+            btns += `<button class="btn btn-sm btn-primary" onclick="showApplyForm()">发起申请</button>`;
+        } else if (item.status === 'delisted') {
+            btns += `<button class="btn btn-sm btn-success" onclick="relistItem('${item.id}')">恢复上架</button>`;
             btns += `<button class="btn btn-sm btn-primary" onclick="showEditForm('${item.id}')">编辑</button>`;
-            hintText = '此货品已下架，无法发起新的置换申请。可重新上架或编辑信息。';
-            break;
-        case 'exchanged':
-            hintText = '此货品已达成置换，不可编辑、下架或发起新申请。如需恢复，请取消已接受的置换申请。';
-            break;
-        default:
-            hintText = `货品状态异常 (${esc(item.status)})`;
+            hintText = '此货品已下架。管理员可恢复上架。';
+        } else if (item.status === 'exchanged') {
+            btns += `<button class="btn btn-sm btn-primary" onclick="showEditForm('${item.id}')">编辑</button>`;
+            hintText = '此货品已达成置换。如需恢复，可取消已接受的置换申请。';
+        }
     }
 
     actions.innerHTML = btns;
@@ -463,8 +564,9 @@ function renderApplications(apps, item) {
     document.getElementById('detail-app-count').textContent = pendingCount;
     document.getElementById('detail-app-count').title = `共 ${apps.length} 条申请，${pendingCount} 条待处理`;
 
+    // 发起申请按钮可见性
     const applyToggle = document.getElementById('btn-apply-toggle');
-    applyToggle.style.display = item.status === 'listed' ? '' : 'none';
+    applyToggle.style.display = canApplyToItem(item) ? '' : 'none';
     document.getElementById('apply-form').style.display = 'none';
 
     const list = document.getElementById('application-list');
@@ -478,22 +580,38 @@ function renderApplications(apps, item) {
 
     list.innerHTML = apps.map(a => {
         let actionBtns = '';
-        if (a.status === 'pending' && item.status === 'listed') {
-            actionBtns = `
-                <button class="btn btn-sm btn-success" onclick="handleApp(this,'${a.id}','accept')">接受</button>
-                <button class="btn btn-sm btn-danger" onclick="handleApp(this,'${a.id}','reject')">拒绝</button>
-                <button class="btn btn-sm btn-secondary" onclick="handleApp(this,'${a.id}','cancel')">取消</button>
-            `;
+        const ownApp = isOwnApp(a);
+        const ownItem = isOwnItem(item);
+
+        if (a.status === 'pending') {
+            // 接受/拒绝：发布人(自己的货品) 或 管理员
+            if (canHandleApp(a, item)) {
+                actionBtns += `<button class="btn btn-sm btn-success" onclick="handleApp(this,'${a.id}','accept')">接受</button>`;
+                actionBtns += `<button class="btn btn-sm btn-danger" onclick="handleApp(this,'${a.id}','reject')">拒绝</button>`;
+            }
+            // 取消待处理：申请人(自己的申请) 或 发布人(自己的货品) 或 管理员
+            if (canCancelApp(a, item)) {
+                const cancelLabel = currentRole === 'applicant' ? '取消申请' : '取消';
+                actionBtns += `<button class="btn btn-sm btn-secondary" onclick="handleApp(this,'${a.id}','cancel')">${cancelLabel}</button>`;
+            }
+            if (!actionBtns) {
+                if (currentRole === 'guest') {
+                    actionBtns = `<span class="op-hint">游客无权操作</span>`;
+                } else {
+                    actionBtns = `<span class="op-hint">当前角色无权操作此申请</span>`;
+                }
+            }
         } else if (a.status === 'accepted') {
-            actionBtns = `<button class="btn btn-sm btn-warning" onclick="handleApp(this,'${a.id}','cancel')">取消置换</button>`;
-        } else if (a.status === 'pending' && item.status !== 'listed') {
-            actionBtns = `<span class="op-hint">货品已${statusLabel(item.status)}，此申请暂不可操作</span>`;
+            // 取消已接受的申请：发布人(自己的货品) 或 管理员
+            if (canCancelApp(a, item)) {
+                actionBtns = `<button class="btn btn-sm btn-warning" onclick="handleApp(this,'${a.id}','cancel')">取消置换</button>`;
+            } else {
+                actionBtns = `<span class="op-hint">已接受${ownApp ? '（你的申请）' : ''}，仅发布人或管理员可取消</span>`;
+            }
         } else if (a.status === 'rejected') {
-            actionBtns = `<span class="op-hint">已拒绝，不可操作</span>`;
+            actionBtns = `<span class="op-hint">已拒绝，不可操作${ownApp ? '（你的申请被拒绝）' : ''}</span>`;
         } else if (a.status === 'cancelled') {
-            actionBtns = `<span class="op-hint">已取消，不可操作</span>`;
-        } else {
-            actionBtns = `<span class="op-hint">状态异常</span>`;
+            actionBtns = `<span class="op-hint">已取消${ownApp ? '（你取消的）' : ''}</span>`;
         }
 
         const offerText = a.offer_item ? `提供: ${esc(a.offer_item)}` : '未指定置换物';
@@ -501,7 +619,7 @@ function renderApplications(apps, item) {
         return `
             <div class="app-card app-${a.status || 'pending'}">
                 <div class="app-header-row">
-                    <span class="app-applicant">${esc(a.applicant || '匿名')}</span>
+                    <span class="app-applicant">${esc(a.applicant || '匿名')}${ownApp ? ' <span class="tag tag-own" style="font-size:10px;margin-left:4px;">我的</span>' : ''}</span>
                     <span class="app-status-badge" style="color:${statusColors[a.status]||'#64748b'};background:${statusBgs[a.status]||'#f1f5f9'}">${statusLabel(a.status)}</span>
                 </div>
                 <div class="app-offer">${offerText}</div>
@@ -541,8 +659,8 @@ function renderStatusHistory(histories) {
 
 // ========== 申请交互 ==========
 function showApplyForm() {
-    if (!currentItem || currentItem.status !== 'listed') {
-        showToast('该货品当前状态不允许发起申请', 'error');
+    if (!currentItem || !canApplyToItem(currentItem)) {
+        showToast('当前角色无法对该货品发起申请', 'error');
         return;
     }
     const f = document.getElementById('apply-form');
@@ -555,7 +673,9 @@ async function submitApplication() {
     const applicant = document.getElementById('apply-applicant').value.trim();
     const offerItem = document.getElementById('apply-offer-item').value.trim();
     const message = document.getElementById('apply-message').value.trim();
-    if (!applicant) { showToast('请填写申请人名字', 'error'); return; }
+    // 使用当前角色用户名作为默认申请人
+    const finalApplicant = applicant || getRoleUser() || '';
+    if (!finalApplicant) { showToast('请填写申请人名字', 'error'); return; }
     if (!offerItem) { showToast('请填写你能提供的置换物', 'error'); return; }
 
     loadingLock['apply'] = true;
@@ -563,7 +683,7 @@ async function submitApplication() {
     try {
         await api('/items/' + currentItem.id + '/applications', {
             method: 'POST',
-            body: JSON.stringify({ applicant, offer_item: offerItem, message }),
+            body: JSON.stringify({ applicant: finalApplicant, offer_item: offerItem, message }),
         });
         showToast('申请已提交');
         document.getElementById('apply-applicant').value = '';
@@ -588,7 +708,6 @@ async function handleApp(btn, appId, action) {
         await api('/applications/' + appId, { method: 'PUT', body: JSON.stringify({ action }) });
         const actionLabels = { accept: '已接受', reject: '已拒绝', cancel: '已取消' };
         showToast(actionLabels[action] || '操作成功');
-        // 操作后检查当前详情项是否仍符合筛选条件
         await afterDetailAction();
     } catch (e) {
         showToast(e.message, 'error');
@@ -602,7 +721,6 @@ async function handleApp(btn, appId, action) {
 async function afterDetailAction() {
     await loadStats();
     if (currentView === 'detail' && currentItemId) {
-        // 重新加载详情
         try {
             const detail = await api('/items/' + currentItemId + '/detail');
             if (!detail || !detail.item) throw new Error('详情数据异常');
@@ -612,64 +730,61 @@ async function afterDetailAction() {
             showToast(e.message, 'error');
             return;
         }
-
-        // 检查当前详情项是否仍符合筛选条件
         if (hasActiveFilters() && !itemMatchesFilters(currentItem)) {
             showToast('当前货品已不再符合筛选条件，即将返回列表', 'info');
-            setTimeout(() => {
-                navigateTo('list');
-            }, 1200);
+            setTimeout(() => { navigateTo('list'); }, 1200);
         }
     } else if (currentView === 'list') {
         await loadItems();
     }
 }
 
-// 检查一个货品是否符合当前筛选条件（前端侧校验，用于操作后判断）
 function itemMatchesFilters(item) {
     const f = getFilterValues();
     if (f.keyword) {
         const kw = f.keyword.toLowerCase();
         if (!(item.title || '').toLowerCase().includes(kw) &&
             !(item.description || '').toLowerCase().includes(kw) &&
-            !(item.expected_exchange || '').toLowerCase().includes(kw)) {
-            return false;
-        }
+            !(item.expected_exchange || '').toLowerCase().includes(kw)) return false;
     }
     if (f.category && item.category !== f.category) return false;
     if (f.city && item.city !== f.city) return false;
     if (f.condition && item.condition !== f.condition) return false;
     if (f.status && item.status !== f.status) return false;
-    // app_status 需要后端数据，此处仅做简化判断
-    // 因为前端缓存了 filteredItems，可以用 ID 判断
-    if (f.app_status) {
-        return cachedFilteredItems.some(i => i.id === item.id);
-    }
+    if (f.app_status) return cachedFilteredItems.some(i => i.id === item.id);
     return true;
 }
 
 // ========== 货品状态操作 ==========
 async function delistItem(id) {
     try {
-        await api('/items/' + id + '/status', { method: 'PUT', body: JSON.stringify({ status: 'delisted' }) });
-        showToast('已下架');
+        await api('/items/' + id + '/status', { method: 'PUT', body: JSON.stringify({ status: 'delisted', operator: getRoleUser() || '操作者', role: currentRole }) });
+        showToast(currentRole === 'admin' ? '已强制下架' : '已下架');
         await afterDetailAction();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function relistItem(id) {
     try {
-        await api('/items/' + id + '/status', { method: 'PUT', body: JSON.stringify({ status: 'listed' }) });
-        showToast('已重新上架');
+        await api('/items/' + id + '/status', { method: 'PUT', body: JSON.stringify({ status: 'listed', operator: getRoleUser() || '操作者', role: currentRole }) });
+        showToast(currentRole === 'admin' ? '已恢复上架' : '已重新上架');
         await afterDetailAction();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
 // ========== 创建/编辑表单 ==========
 function showCreateForm() {
+    if (!canCreateItem()) {
+        showToast('当前角色无法发布货品', 'error');
+        return;
+    }
     document.getElementById('form-title').textContent = '发布新货品';
     document.getElementById('form-item-id').value = '';
     document.getElementById('item-form').reset();
+    // 发布人模式下预填发布人
+    if (getRoleUser()) {
+        document.getElementById('form-field-publisher').value = getRoleUser();
+    }
     document.getElementById('form-back-btn').onclick = () => navigateTo('list');
     document.getElementById('form-cancel-btn').onclick = () => navigateTo('list');
     navigateTo('form');
@@ -678,7 +793,10 @@ function showCreateForm() {
 function showEditForm(id) {
     const item = currentItem;
     if (!item) return;
-    if (item.status === 'exchanged') { showToast('已置换的货品不可编辑', 'error'); return; }
+    if (!canEditItem(item)) {
+        showToast('当前角色无法编辑此货品', 'error');
+        return;
+    }
     document.getElementById('form-title').textContent = '编辑货品';
     document.getElementById('form-item-id').value = item.id;
     document.getElementById('form-field-title').value = item.title || '';
@@ -688,7 +806,6 @@ function showEditForm(id) {
     document.getElementById('form-field-exchange').value = item.expected_exchange || '';
     document.getElementById('form-field-publisher').value = item.publisher || '';
     document.getElementById('form-field-description').value = item.description || '';
-    // 编辑返回时保持筛选状态
     document.getElementById('form-back-btn').onclick = () => { restoreFilterState(); navigateTo('detail', item.id); };
     document.getElementById('form-cancel-btn').onclick = () => { restoreFilterState(); navigateTo('detail', item.id); };
     saveFilterState();
@@ -721,7 +838,6 @@ async function submitItemForm(e) {
         if (id) {
             await api('/items/' + id, { method: 'PUT', body: JSON.stringify(payload) });
             showToast('编辑成功');
-            // 编辑后回到详情，保持筛选
             restoreFilterState();
             navigateTo('detail', id);
         } else {
@@ -741,6 +857,9 @@ async function submitItemForm(e) {
 document.addEventListener('DOMContentLoaded', () => {
     const urlEl = document.getElementById('header-url');
     urlEl.innerHTML = '<strong>' + esc(window.location.origin) + '</strong> ← 访问入口';
+
+    // 初始化角色 UI
+    document.getElementById('btn-create-item').style.display = canCreateItem() ? '' : 'none';
 
     loadFilterOptions();
     loadItems();

@@ -11,8 +11,18 @@
         <div class="header-inner">
             <h1 class="logo" onclick="navigateTo('list')">🔄 二手置换平台</h1>
             <div class="header-right">
+                <!-- 角色切换区 -->
+                <div class="role-switcher" id="role-switcher">
+                    <label>当前角色：</label>
+                    <select id="current-role" onchange="switchRole(this.value)">
+                        <option value="guest">游客</option>
+                        <option value="publisher" selected>发布人 (张三)</option>
+                        <option value="applicant">申请人 (陈一)</option>
+                        <option value="admin">平台管理员</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" id="btn-create-item" onclick="showCreateForm()">+ 发布货品</button>
                 <span class="header-url" id="header-url"></span>
-                <button class="btn btn-primary" onclick="showCreateForm()">+ 发布货品</button>
             </div>
         </div>
     </header>
