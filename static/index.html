@@ -33,14 +33,23 @@
             <input type="text" id="filter-keyword" placeholder="搜索关键词..." oninput="debounceLoadItems()">
             <select id="filter-category" onchange="loadItems()"><option value="">全部品类</option></select>
             <select id="filter-city" onchange="loadItems()"><option value="">全部城市</option></select>
+            <select id="filter-condition" onchange="loadItems()"><option value="">全部成色</option></select>
             <select id="filter-status" onchange="loadItems()">
                 <option value="">全部状态</option>
                 <option value="listed">上架中</option>
                 <option value="exchanged">已置换</option>
                 <option value="delisted">已下架</option>
             </select>
-            <button class="btn btn-secondary" onclick="clearFilters()">清除筛选</button>
+            <select id="filter-app-status" onchange="loadItems()">
+                <option value="">全部申请状态</option>
+                <option value="pending">待处理</option>
+                <option value="accepted">已接受</option>
+                <option value="rejected">已拒绝</option>
+                <option value="cancelled">已取消</option>
+            </select>
+            <button class="btn btn-secondary" onclick="clearFilters()">清除全部</button>
         </div>
+        <div class="active-filters" id="active-filters" style="display:none;"></div>
         <div class="item-grid" id="item-grid"></div>
         <div class="result-count" id="result-count" style="display:none;"></div>
         <div class="empty-state" id="empty-state" style="display:none;">

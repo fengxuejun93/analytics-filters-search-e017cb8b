@@ -28,10 +28,12 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 // GET /api/items
 func (h *Handler) ListItems(w http.ResponseWriter, r *http.Request) {
 	filter := FilterParams{
-		Keyword:  r.URL.Query().Get("keyword"),
-		Category: r.URL.Query().Get("category"),
-		City:     r.URL.Query().Get("city"),
-		Status:   r.URL.Query().Get("status"),
+		Keyword:   r.URL.Query().Get("keyword"),
+		Category:  r.URL.Query().Get("category"),
+		City:      r.URL.Query().Get("city"),
+		Status:    r.URL.Query().Get("status"),
+		Condition: r.URL.Query().Get("condition"),
+		AppStatus: r.URL.Query().Get("app_status"),
 	}
 	result := h.store.ListItemsWithTotal(filter)
 	writeJSON(w, http.StatusOK, result)
@@ -165,10 +167,17 @@ func (h *Handler) GetFilterOptions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"categories": h.store.GetCategories(),
 		"cities":     h.store.GetCities(),
+		"conditions": h.store.GetConditions(),
 		"statuses": []map[string]string{
 			{"value": "listed", "label": "上架中"},
 			{"value": "exchanged", "label": "已置换"},
 			{"value": "delisted", "label": "已下架"},
+		},
+		"app_statuses": []map[string]string{
+			{"value": "pending", "label": "待处理"},
+			{"value": "accepted", "label": "已接受"},
+			{"value": "rejected", "label": "已拒绝"},
+			{"value": "cancelled", "label": "已取消"},
 		},
 	})
 }

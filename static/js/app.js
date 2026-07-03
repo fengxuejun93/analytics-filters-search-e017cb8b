@@ -6,6 +6,7 @@ let savedFilters = {};
 let filterOptions = null;
 let debounceTimer = null;
 let loadingLock = {};  // 防重复提交锁
+let cachedFilteredItems = []; // 缓存当前筛选结果列表
 
 // ========== 工具函数 ==========
 const API = '/api';
@@ -102,11 +103,13 @@ function debounceLoadItems() {
     debounceTimer = setTimeout(loadItems, 300);
 }
 
-// ========== 全量刷新 ==========
+// ========== 全量刷新（保持筛选状态） ==========
 async function refreshAll() {
     await loadStats();
     if (currentView === 'detail' && currentItemId) {
         await loadDetail(currentItemId);
+    } else if (currentView === 'list') {
+        await loadItems();
     }
 }
 
@@ -147,10 +150,22 @@ async function loadStats() {
 }
 
 function filterByStat(status) {
-    // pending/rejected/cancelled 是申请维度，不能直接按货品状态筛选
+    // pending/rejected/cancelled 是申请维度 → 使用申请状态筛选
     if (status === 'pending' || status === 'rejected' || status === 'cancelled') {
-        const label = statusLabel(status);
-        showToast(`${label}为申请维度，请在货品详情中查看申请状态`, 'info');
+        currentView = 'list';
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-list').classList.add('active');
+        currentItemId = null;
+        currentItem = null;
+        // 清除其他筛选，设置申请状态
+        document.getElementById('filter-keyword').value = '';
+        document.getElementById('filter-category').value = '';
+        document.getElementById('filter-city').value = '';
+        document.getElementById('filter-condition').value = '';
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-app-status').value = status;
+        loadItems();
+        loadStats();
         return;
     }
     currentView = 'list';
@@ -161,6 +176,8 @@ function filterByStat(status) {
     document.getElementById('filter-keyword').value = '';
     document.getElementById('filter-category').value = '';
     document.getElementById('filter-city').value = '';
+    document.getElementById('filter-condition').value = '';
+    document.getElementById('filter-app-status').value = '';
     document.getElementById('filter-status').value = status;
     loadItems();
     loadStats();
@@ -172,58 +189,126 @@ async function loadFilterOptions() {
         filterOptions = await api('/filters');
         const catSel = document.getElementById('filter-category');
         catSel.innerHTML = '<option value="">全部品类</option>';
-        (filterOptions.categories || []).forEach(c => { catSel.innerHTML += `<option value="${c}">${c}</option>`; });
+        (filterOptions.categories || []).forEach(c => { catSel.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`; });
+
         const citySel = document.getElementById('filter-city');
         citySel.innerHTML = '<option value="">全部城市</option>';
-        (filterOptions.cities || []).forEach(c => { citySel.innerHTML += `<option value="${c}">${c}</option>`; });
+        (filterOptions.cities || []).forEach(c => { citySel.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`; });
+
+        const condSel = document.getElementById('filter-condition');
+        condSel.innerHTML = '<option value="">全部成色</option>';
+        (filterOptions.conditions || []).forEach(c => { condSel.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`; });
     } catch (e) { console.error('加载筛选选项失败:', e); }
 }
 
-function saveFilterState() {
-    savedFilters = {
-        keyword: document.getElementById('filter-keyword').value,
+function getFilterValues() {
+    return {
+        keyword: document.getElementById('filter-keyword').value.trim(),
         category: document.getElementById('filter-category').value,
         city: document.getElementById('filter-city').value,
+        condition: document.getElementById('filter-condition').value,
         status: document.getElementById('filter-status').value,
+        app_status: document.getElementById('filter-app-status').value,
     };
 }
+
+function saveFilterState() {
+    savedFilters = getFilterValues();
+}
+
 function restoreFilterState() {
     if (savedFilters.keyword !== undefined) {
         document.getElementById('filter-keyword').value = savedFilters.keyword;
         document.getElementById('filter-category').value = savedFilters.category;
         document.getElementById('filter-city').value = savedFilters.city;
+        document.getElementById('filter-condition').value = savedFilters.condition || '';
         document.getElementById('filter-status').value = savedFilters.status;
+        document.getElementById('filter-app-status').value = savedFilters.app_status || '';
     }
 }
+
 function clearFilters() {
     document.getElementById('filter-keyword').value = '';
     document.getElementById('filter-category').value = '';
     document.getElementById('filter-city').value = '';
+    document.getElementById('filter-condition').value = '';
     document.getElementById('filter-status').value = '';
+    document.getElementById('filter-app-status').value = '';
+    savedFilters = {};
     loadItems();
 }
+
+function clearSingleFilter(field) {
+    if (field === 'keyword') {
+        document.getElementById('filter-keyword').value = '';
+    } else if (field === 'category') {
+        document.getElementById('filter-category').value = '';
+    } else if (field === 'city') {
+        document.getElementById('filter-city').value = '';
+    } else if (field === 'condition') {
+        document.getElementById('filter-condition').value = '';
+    } else if (field === 'status') {
+        document.getElementById('filter-status').value = '';
+    } else if (field === 'app_status') {
+        document.getElementById('filter-app-status').value = '';
+    }
+    loadItems();
+}
+
 function hasActiveFilters() {
-    return !!document.getElementById('filter-keyword').value.trim() ||
-           !!document.getElementById('filter-category').value ||
-           !!document.getElementById('filter-city').value ||
-           !!document.getElementById('filter-status').value;
+    const f = getFilterValues();
+    return !!f.keyword || !!f.category || !!f.city || !!f.condition || !!f.status || !!f.app_status;
+}
+
+// 渲染激活的筛选标签
+function renderActiveFilterTags() {
+    const container = document.getElementById('active-filters');
+    const f = getFilterValues();
+    const tags = [];
+
+    const labelMap = {
+        keyword: '关键词',
+        category: '品类',
+        city: '城市',
+        condition: '成色',
+        status: '货品状态',
+        app_status: '申请状态',
+    };
+
+    for (const [key, label] of Object.entries(labelMap)) {
+        const val = f[key];
+        if (val) {
+            const displayVal = statusLabel(val) || val;
+            tags.push(`<span class="filter-tag">${esc(label)}: ${esc(displayVal)} <span class="filter-tag-remove" onclick="clearSingleFilter('${key}')" title="移除此筛选">&times;</span></span>`);
+        }
+    }
+
+    if (tags.length > 0) {
+        container.innerHTML = tags.join('');
+        container.style.display = 'flex';
+    } else {
+        container.innerHTML = '';
+        container.style.display = 'none';
+    }
 }
 
 // ========== 货品列表 ==========
 async function loadItems() {
     const params = new URLSearchParams();
-    const kw = document.getElementById('filter-keyword').value.trim();
-    const cat = document.getElementById('filter-category').value;
-    const city = document.getElementById('filter-city').value;
-    const status = document.getElementById('filter-status').value;
-    if (kw) params.set('keyword', kw);
-    if (cat) params.set('category', cat);
-    if (city) params.set('city', city);
-    if (status) params.set('status', status);
+    const f = getFilterValues();
+    if (f.keyword) params.set('keyword', f.keyword);
+    if (f.category) params.set('category', f.category);
+    if (f.city) params.set('city', f.city);
+    if (f.condition) params.set('condition', f.condition);
+    if (f.status) params.set('status', f.status);
+    if (f.app_status) params.set('app_status', f.app_status);
 
     const grid = document.getElementById('item-grid');
     const empty = document.getElementById('empty-state');
     const resultCount = document.getElementById('result-count');
+
+    // 渲染筛选标签
+    renderActiveFilterTags();
 
     // 重置空状态为默认内容
     function resetEmptyState() {
@@ -235,8 +320,14 @@ async function loadItems() {
         const items = resp.items || (Array.isArray(resp) ? resp : []);
         const totalCount = resp.total_count ?? items.length;
 
+        // 缓存筛选结果
+        cachedFilteredItems = items;
+
         if (hasActiveFilters() && totalCount > 0) {
             resultCount.textContent = `当前结果: ${items.length} / 全部: ${totalCount}`;
+            resultCount.style.display = 'block';
+        } else if (hasActiveFilters() && totalCount === 0) {
+            resultCount.textContent = `当前结果: 0 / 全部: ${totalCount}`;
             resultCount.style.display = 'block';
         } else {
             resultCount.style.display = 'none';
@@ -250,14 +341,14 @@ async function loadItems() {
         }
         empty.style.display = 'none';
         grid.innerHTML = items.map(item => `
-            <div class="item-card" onclick="openDetail('${esc(item.id)}')">
+            <div class="item-card ${currentItemId === item.id ? 'item-card-active' : ''}" onclick="openDetail('${esc(item.id)}')">
                 <div class="item-card-image">📷</div>
                 <div class="item-card-body">
                     <div class="item-card-title">${esc(item.title || '无标题')}</div>
                     <div class="item-card-tags">
                         <span class="tag tag-category">${esc(item.category || '未分类')}</span>
-                        <span class="tag tag-condition">${esc(item.condition || '-')}</span>
-                        <span class="tag tag-city">${esc(item.city || '-')}</span>
+                        <span class="tag tag-condition">${esc(item.condition || '未填写')}</span>
+                        <span class="tag tag-city">${esc(item.city || '未填写')}</span>
                     </div>
                     <div class="item-card-bottom">
                         <span class="item-card-exchange">期望: ${esc(item.expected_exchange || '不限')}</span>
@@ -294,7 +385,6 @@ async function loadDetail(itemId) {
         renderDetail(detail);
     } catch (e) {
         showToast(e.message, 'error');
-        // 显示错误信息+重新加载按钮
         const nav = document.querySelector('.detail-nav');
         const errorHtml = `<div class="detail-error"><p>加载详情失败: ${esc(e.message)}</p><button class="btn btn-primary btn-sm" onclick="loadDetail('${esc(itemId)}')">重新加载</button> <button class="btn btn-secondary btn-sm" onclick="navigateTo('list')">返回列表</button></div>`;
         if (container) container.innerHTML = errorHtml;
@@ -312,8 +402,8 @@ function renderDetail(detail) {
 
     document.getElementById('detail-meta').innerHTML = `
         <span class="tag tag-category">${esc(item.category || '未分类')}</span>
-        <span class="tag tag-condition">${esc(item.condition || '-')}</span>
-        <span class="tag tag-city">${esc(item.city || '-')}</span>
+        <span class="tag tag-condition">${esc(item.condition || '未填写')}</span>
+        <span class="tag tag-city">${esc(item.city || '未填写')}</span>
         <span class="status-badge status-${item.status || 'listed'}">${statusLabel(item.status)}</span>
     `;
 
@@ -498,7 +588,8 @@ async function handleApp(btn, appId, action) {
         await api('/applications/' + appId, { method: 'PUT', body: JSON.stringify({ action }) });
         const actionLabels = { accept: '已接受', reject: '已拒绝', cancel: '已取消' };
         showToast(actionLabels[action] || '操作成功');
-        refreshAll();
+        // 操作后检查当前详情项是否仍符合筛选条件
+        await afterDetailAction();
     } catch (e) {
         showToast(e.message, 'error');
     } finally {
@@ -507,12 +598,62 @@ async function handleApp(btn, appId, action) {
     }
 }
 
+// ========== 详情操作后：刷新数据并检查筛选匹配 ==========
+async function afterDetailAction() {
+    await loadStats();
+    if (currentView === 'detail' && currentItemId) {
+        // 重新加载详情
+        try {
+            const detail = await api('/items/' + currentItemId + '/detail');
+            if (!detail || !detail.item) throw new Error('详情数据异常');
+            currentItem = detail.item;
+            renderDetail(detail);
+        } catch (e) {
+            showToast(e.message, 'error');
+            return;
+        }
+
+        // 检查当前详情项是否仍符合筛选条件
+        if (hasActiveFilters() && !itemMatchesFilters(currentItem)) {
+            showToast('当前货品已不再符合筛选条件，即将返回列表', 'info');
+            setTimeout(() => {
+                navigateTo('list');
+            }, 1200);
+        }
+    } else if (currentView === 'list') {
+        await loadItems();
+    }
+}
+
+// 检查一个货品是否符合当前筛选条件（前端侧校验，用于操作后判断）
+function itemMatchesFilters(item) {
+    const f = getFilterValues();
+    if (f.keyword) {
+        const kw = f.keyword.toLowerCase();
+        if (!(item.title || '').toLowerCase().includes(kw) &&
+            !(item.description || '').toLowerCase().includes(kw) &&
+            !(item.expected_exchange || '').toLowerCase().includes(kw)) {
+            return false;
+        }
+    }
+    if (f.category && item.category !== f.category) return false;
+    if (f.city && item.city !== f.city) return false;
+    if (f.condition && item.condition !== f.condition) return false;
+    if (f.status && item.status !== f.status) return false;
+    // app_status 需要后端数据，此处仅做简化判断
+    // 因为前端缓存了 filteredItems，可以用 ID 判断
+    if (f.app_status) {
+        return cachedFilteredItems.some(i => i.id === item.id);
+    }
+    return true;
+}
+
 // ========== 货品状态操作 ==========
 async function delistItem(id) {
     try {
         await api('/items/' + id + '/status', { method: 'PUT', body: JSON.stringify({ status: 'delisted' }) });
         showToast('已下架');
-        refreshAll();
+        await afterDetailAction();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
@@ -520,7 +661,7 @@ async function relistItem(id) {
     try {
         await api('/items/' + id + '/status', { method: 'PUT', body: JSON.stringify({ status: 'listed' }) });
         showToast('已重新上架');
-        refreshAll();
+        await afterDetailAction();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
@@ -547,8 +688,10 @@ function showEditForm(id) {
     document.getElementById('form-field-exchange').value = item.expected_exchange || '';
     document.getElementById('form-field-publisher').value = item.publisher || '';
     document.getElementById('form-field-description').value = item.description || '';
-    document.getElementById('form-back-btn').onclick = () => navigateTo('detail', item.id);
-    document.getElementById('form-cancel-btn').onclick = () => navigateTo('detail', item.id);
+    // 编辑返回时保持筛选状态
+    document.getElementById('form-back-btn').onclick = () => { restoreFilterState(); navigateTo('detail', item.id); };
+    document.getElementById('form-cancel-btn').onclick = () => { restoreFilterState(); navigateTo('detail', item.id); };
+    saveFilterState();
     navigateTo('form');
 }
 
@@ -578,10 +721,13 @@ async function submitItemForm(e) {
         if (id) {
             await api('/items/' + id, { method: 'PUT', body: JSON.stringify(payload) });
             showToast('编辑成功');
+            // 编辑后回到详情，保持筛选
+            restoreFilterState();
             navigateTo('detail', id);
         } else {
             const newItem = await api('/items', { method: 'POST', body: JSON.stringify(payload) });
             showToast('发布成功');
+            restoreFilterState();
             navigateTo('detail', newItem.id);
         }
     } catch (e) {

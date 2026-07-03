@@ -510,6 +510,22 @@ func (s *Store) ListItemsWithTotal(filter FilterParams) *ItemListResponse {
 		if filter.Status != "" && string(item.Status) != filter.Status {
 			continue
 		}
+		if filter.Condition != "" && item.Condition != filter.Condition {
+			continue
+		}
+		if filter.AppStatus != "" {
+			// 检查该货品是否有指定状态的申请
+			hasApp := false
+			for _, app := range s.applications {
+				if app.ItemID == item.ID && string(app.Status) == filter.AppStatus {
+					hasApp = true
+					break
+				}
+			}
+			if !hasApp {
+				continue
+			}
+		}
 		result = append(result, item)
 	}
 
@@ -531,7 +547,7 @@ func (s *Store) GetCategories() []string {
 	seen := make(map[string]bool)
 	var result []string
 	for _, item := range s.items {
-		if !seen[item.Category] {
+		if item.Category != "" && !seen[item.Category] {
 			seen[item.Category] = true
 			result = append(result, item.Category)
 		}
@@ -548,9 +564,26 @@ func (s *Store) GetCities() []string {
 	seen := make(map[string]bool)
 	var result []string
 	for _, item := range s.items {
-		if !seen[item.City] {
+		if item.City != "" && !seen[item.City] {
 			seen[item.City] = true
 			result = append(result, item.City)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
+// 获取所有成色
+func (s *Store) GetConditions() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	seen := make(map[string]bool)
+	var result []string
+	for _, item := range s.items {
+		if item.Condition != "" && !seen[item.Condition] {
+			seen[item.Condition] = true
+			result = append(result, item.Condition)
 		}
 	}
 	sort.Strings(result)

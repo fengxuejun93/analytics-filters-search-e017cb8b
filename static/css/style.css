@@ -57,6 +57,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .filters input, .filters select { padding: 8px 12px; border: 1px solid var(--c-border); border-radius: var(--radius); font-size: 14px; background: var(--c-card); min-width: 140px; }
 .filters input { flex: 1; min-width: 200px; }
 
+/* ========== Active Filter Tags ========== */
+.active-filters { max-width: 1200px; margin: 0 auto 12px; padding: 0 24px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.filter-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; cursor: default; user-select: none; }
+.filter-tag .filter-tag-remove { cursor: pointer; color: #6366f1; font-weight: 700; padding: 0 1px; line-height: 1; border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; transition: background .15s; }
+.filter-tag .filter-tag-remove:hover { background: rgba(99,102,241,.15); }
+
 /* ========== Item Grid ========== */
 .item-grid { max-width: 1200px; margin: 0 auto; padding: 0 24px 40px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
 .item-card { background: var(--c-card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; transition: transform .15s, box-shadow .15s; }

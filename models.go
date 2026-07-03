@@ -112,8 +112,10 @@ type ItemDetailResponse struct {
 
 // 筛选参数
 type FilterParams struct {
-	Keyword  string `json:"keyword"`
-	Category string `json:"category"`
-	City     string `json:"city"`
-	Status   string `json:"status"`
+	Keyword    string `json:"keyword"`
+	Category   string `json:"category"`
+	City       string `json:"city"`
+	Status     string `json:"status"`
+	Condition  string `json:"condition"`
+	AppStatus  string `json:"app_status"` // 申请处理状态：pending/accepted/rejected/cancelled
 }
