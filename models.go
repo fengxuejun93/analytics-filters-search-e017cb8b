@@ -53,6 +53,7 @@ type Application struct {
 	ID        string            `json:"id"`
 	ItemID    string            `json:"item_id"`
 	Applicant string            `json:"applicant"`
+	OfferItem string            `json:"offer_item"`
 	Message   string            `json:"message"`
 	Status    ApplicationStatus `json:"status"`
 	CreatedAt time.Time         `json:"created_at"`
@@ -84,6 +85,7 @@ type ItemRequest struct {
 // 创建置换申请请求
 type ApplicationRequest struct {
 	Applicant string `json:"applicant"`
+	OfferItem string `json:"offer_item"`
 	Message   string `json:"message"`
 }
 

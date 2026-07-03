@@ -40,8 +40,8 @@ func (s *Store) seedData() {
 		{
 			ID: "item-2", Title: "宜家 KALLAX 书架", Category: "家具家居", Condition: "八成新",
 			City: "上海", ExpectedExchange: "落地灯或收纳柜", Publisher: "李四",
-			Status: ItemStatusListed, Description: "宜家经典方格书架，白色2x4款式，搬家后空间不够用，有轻微使用痕迹。希望换落地灯或收纳柜。",
-			ImageURL: "", CreatedAt: time.Now().Add(-48 * time.Hour), UpdatedAt: time.Now().Add(-48 * time.Hour),
+			Status: ItemStatusExchanged, Description: "宜家经典方格书架，白色2x4款式，搬家后空间不够用，有轻微使用痕迹。希望换落地灯或收纳柜。",
+			ImageURL: "", CreatedAt: time.Now().Add(-48 * time.Hour), UpdatedAt: time.Now().Add(-10 * time.Hour),
 		},
 		{
 			ID: "item-3", Title: "Switch 健身环大冒险套装", Category: "数码电子", Condition: "九五新",
@@ -76,23 +76,23 @@ func (s *Store) seedData() {
 
 	apps := []Application{
 		{
-			ID: "app-1", ItemID: "item-1", Applicant: "陈一", Message: "我有一台 iPad Pro 2022 11寸 128GB，感兴趣吗？",
+			ID: "app-1", ItemID: "item-1", Applicant: "陈一", OfferItem: "iPad Pro 2022 11寸 128GB", Message: "我有一台 iPad Pro 2022 11寸 128GB，感兴趣吗？",
 			Status: AppStatusPending, CreatedAt: time.Now().Add(-36 * time.Hour), UpdatedAt: time.Now().Add(-36 * time.Hour),
 		},
 		{
-			ID: "app-2", ItemID: "item-1", Applicant: "吴二", Message: "有一台 LG 4K 显示器 27寸，可以加一些差价。",
+			ID: "app-2", ItemID: "item-1", Applicant: "吴二", OfferItem: "LG 4K 显示器 27寸", Message: "有一台 LG 4K 显示器 27寸，可以加一些差价。",
 			Status: AppStatusPending, CreatedAt: time.Now().Add(-24 * time.Hour), UpdatedAt: time.Now().Add(-24 * time.Hour),
 		},
 		{
-			ID: "app-3", ItemID: "item-2", Applicant: "郑三", Message: "我有一款飞利浦落地灯，九成新，可以交换。",
+			ID: "app-3", ItemID: "item-2", Applicant: "郑三", OfferItem: "飞利浦落地灯 九成新", Message: "我有一款飞利浦落地灯，九成新，可以交换。",
 			Status: AppStatusAccepted, CreatedAt: time.Now().Add(-40 * time.Hour), UpdatedAt: time.Now().Add(-10 * time.Hour),
 		},
 		{
-			ID: "app-4", ItemID: "item-4", Applicant: "冯四", Message: "有一台小型跑步机，用了一年，可以换吗？",
+			ID: "app-4", ItemID: "item-4", Applicant: "冯四", OfferItem: "小型跑步机", Message: "有一台小型跑步机，用了一年，可以换吗？",
 			Status: AppStatusRejected, CreatedAt: time.Now().Add(-8 * time.Hour), UpdatedAt: time.Now().Add(-4 * time.Hour),
 		},
 		{
-			ID: "app-5", ItemID: "item-6", Applicant: "何五", Message: "AirPods Pro 2代可以换。",
+			ID: "app-5", ItemID: "item-6", Applicant: "何五", OfferItem: "AirPods Pro 2代", Message: "AirPods Pro 2代可以换。",
 			Status: AppStatusAccepted, CreatedAt: time.Now().Add(-96 * time.Hour), UpdatedAt: time.Now().Add(-2 * time.Hour),
 		},
 	}
@@ -106,6 +106,8 @@ func (s *Store) seedData() {
 	s.historySeq = 10
 	s.history["item-1"] = []*StatusHistory{
 		{ID: "h-1", ItemID: "item-1", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "张三", CreatedAt: time.Now().Add(-72 * time.Hour)},
+		{ID: "h-1a", ItemID: "item-1", FromStatus: "listed", ToStatus: "listed", Reason: "陈一 发起置换申请（提供: iPad Pro 2022 11寸 128GB）", Operator: "陈一", CreatedAt: time.Now().Add(-36 * time.Hour)},
+		{ID: "h-1b", ItemID: "item-1", FromStatus: "listed", ToStatus: "listed", Reason: "吴二 发起置换申请（提供: LG 4K 显示器 27寸）", Operator: "吴二", CreatedAt: time.Now().Add(-24 * time.Hour)},
 	}
 	s.history["item-2"] = []*StatusHistory{
 		{ID: "h-2", ItemID: "item-2", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "李四", CreatedAt: time.Now().Add(-48 * time.Hour)},
@@ -116,6 +118,8 @@ func (s *Store) seedData() {
 	}
 	s.history["item-4"] = []*StatusHistory{
 		{ID: "h-5", ItemID: "item-4", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "赵六", CreatedAt: time.Now().Add(-12 * time.Hour)},
+		{ID: "h-5a", ItemID: "item-4", FromStatus: "listed", ToStatus: "listed", Reason: "冯四 发起置换申请（提供: 小型跑步机）", Operator: "冯四", CreatedAt: time.Now().Add(-8 * time.Hour)},
+		{ID: "h-5b", ItemID: "item-4", FromStatus: "listed", ToStatus: "listed", Reason: "拒绝 冯四 的置换申请", Operator: "赵六", CreatedAt: time.Now().Add(-4 * time.Hour)},
 	}
 	s.history["item-5"] = []*StatusHistory{
 		{ID: "h-6", ItemID: "item-5", FromStatus: "", ToStatus: "listed", Reason: "发布上架", Operator: "孙七", CreatedAt: time.Now().Add(-6 * time.Hour)},
@@ -272,6 +276,7 @@ func (s *Store) UpdateItem(id string, req ItemRequest) (*Item, bool) {
 	item.Description = req.Description
 	item.ImageURL = req.ImageURL
 	item.UpdatedAt = time.Now()
+	s.addHistory(id, string(item.Status), string(item.Status), "编辑货品信息", req.Publisher)
 	return item, true
 }
 
@@ -345,12 +350,21 @@ func (s *Store) CreateApplication(itemID string, req ApplicationRequest) (*Appli
 		ID:        fmt.Sprintf("app-%d", s.appSeq),
 		ItemID:    itemID,
 		Applicant: req.Applicant,
+		OfferItem: req.OfferItem,
 		Message:   req.Message,
 		Status:    AppStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 	s.applications[app.ID] = app
+
+	offerDesc := req.OfferItem
+	if offerDesc == "" {
+		offerDesc = "未指定"
+	}
+	s.addHistory(itemID, string(item.Status), string(item.Status),
+		fmt.Sprintf("%s 发起置换申请（提供: %s）", req.Applicant, offerDesc), req.Applicant)
+
 	return app, nil
 }
 
@@ -380,12 +394,19 @@ func (s *Store) HandleApplication(appID string, action string) (*Application, er
 				if other.ItemID == app.ItemID && other.ID != app.ID && other.Status == AppStatusPending {
 					other.Status = AppStatusRejected
 					other.UpdatedAt = time.Now()
+					s.addHistory(app.ItemID, "listed", "listed", fmt.Sprintf("自动拒绝 %s 的申请（已接受其他申请）", other.Applicant), "系统")
 				}
 			}
 		case "reject":
 			app.Status = AppStatusRejected
+			if item, ok := s.items[app.ItemID]; ok {
+				s.addHistory(app.ItemID, string(item.Status), string(item.Status), fmt.Sprintf("拒绝 %s 的置换申请", app.Applicant), item.Publisher)
+			}
 		case "cancel":
 			app.Status = AppStatusCancelled
+			if item, ok := s.items[app.ItemID]; ok {
+				s.addHistory(app.ItemID, string(item.Status), string(item.Status), fmt.Sprintf("%s 取消置换申请", app.Applicant), app.Applicant)
+			}
 		default:
 			return nil, fmt.Errorf("不支持的操作: %s", action)
 		}

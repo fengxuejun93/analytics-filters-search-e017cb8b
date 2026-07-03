@@ -80,7 +80,8 @@
                         <h3>置换申请 <span class="badge" id="detail-app-count">0</span> <button class="btn btn-sm btn-primary" onclick="showApplyForm()" id="btn-apply-toggle">发起申请</button></h3>
                         <div id="apply-form" class="apply-form" style="display:none;">
                             <input type="text" id="apply-applicant" placeholder="你的名字">
-                            <textarea id="apply-message" placeholder="留言说明你能提供的置换物..." rows="2"></textarea>
+                            <input type="text" id="apply-offer-item" placeholder="你能提供的置换物（如：iPad Pro 2022）">
+                            <textarea id="apply-message" placeholder="补充留言说明..." rows="2"></textarea>
                             <button class="btn btn-primary btn-sm" onclick="submitApplication()">提交申请</button>
                         </div>
                         <div id="application-list"></div>

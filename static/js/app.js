@@ -1,8 +1,8 @@
 // ========== 全局状态 ==========
 let currentView = 'list';
-let currentItem = null;       // 当前详情的货品对象
-let currentItemId = null;     // 当前详情的货品ID
-let savedFilters = {};        // 进入详情前保存的筛选状态
+let currentItem = null;
+let currentItemId = null;
+let savedFilters = {};
 let filterOptions = null;
 let debounceTimer = null;
 
@@ -51,6 +51,25 @@ const statusMap = {
     pending: '待处理', accepted: '已接受', rejected: '已拒绝', cancelled: '已取消',
 };
 
+// 状态历史事件图标
+const historyIcons = {
+    '发布上架': '🟢',
+    '编辑货品信息': '✏️',
+    '主动下架': '🔴',
+    '重新上架/恢复上架': '🔄',
+};
+function historyIcon(reason) {
+    for (const [key, icon] of Object.entries(historyIcons)) {
+        if (reason.includes(key)) return icon;
+    }
+    if (reason.includes('发起置换申请')) return '📋';
+    if (reason.includes('接受')) return '✅';
+    if (reason.includes('拒绝')) return '❌';
+    if (reason.includes('取消')) return '↩️';
+    if (reason.includes('自动拒绝')) return '⛔';
+    return '•';
+}
+
 function esc(s) {
     if (!s) return '';
     const d = document.createElement('div');
@@ -61,6 +80,14 @@ function esc(s) {
 function debounceLoadItems() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(loadItems, 300);
+}
+
+// ========== 全量刷新（保证列表/详情/统计一致） ==========
+async function refreshAll() {
+    await loadStats();
+    if (currentView === 'detail' && currentItemId) {
+        await loadDetail(currentItemId);
+    }
 }
 
 // ========== 导航 ==========
@@ -185,7 +212,6 @@ async function loadItems() {
 }
 
 function openDetail(itemId) {
-    // 进入详情前保存筛选状态，返回时恢复
     saveFilterState();
     navigateTo('detail', itemId);
 }
@@ -205,16 +231,10 @@ function renderDetail(detail) {
     const apps = detail.applications || [];
     const history = detail.status_history || [];
 
-    // 导航面包屑
     document.getElementById('detail-nav-item').textContent = item.title;
-
-    // 图片占位
     document.getElementById('detail-image').textContent = '📷';
-
-    // 标题
     document.getElementById('detail-title').textContent = item.title;
 
-    // 元信息标签
     document.getElementById('detail-meta').innerHTML = `
         <span class="tag tag-category">${esc(item.category)}</span>
         <span class="tag tag-condition">${esc(item.condition)}</span>
@@ -222,7 +242,6 @@ function renderDetail(detail) {
         <span class="status-badge status-${item.status}">${statusMap[item.status]}</span>
     `;
 
-    // 字段表格
     document.getElementById('detail-fields').innerHTML = `
         <div class="field-row"><span class="field-label">品类</span><span class="field-value">${esc(item.category)}</span></div>
         <div class="field-row"><span class="field-label">成色</span><span class="field-value">${esc(item.condition)}</span></div>
@@ -233,17 +252,11 @@ function renderDetail(detail) {
         <div class="field-row"><span class="field-label">最后更新</span><span class="field-value">${formatTimeFull(item.updated_at)}</span></div>
     `;
 
-    // 描述与交换条件
     document.getElementById('detail-desc').textContent = item.description || '暂无描述';
     document.getElementById('detail-exchange').textContent = item.expected_exchange || '不限';
 
-    // 操作按钮 + 状态提示
     renderDetailActions(item);
-
-    // 申请列表
     renderApplications(apps, item);
-
-    // 状态历史时间线
     renderStatusHistory(history);
 }
 
@@ -261,7 +274,7 @@ function renderDetailActions(item) {
         case 'delisted':
             btns += `<button class="btn btn-sm btn-success" onclick="relistItem('${item.id}')">重新上架</button>`;
             btns += `<button class="btn btn-sm btn-primary" onclick="showEditForm('${item.id}')">编辑</button>`;
-            hintText = '此货品已下架，无法发起新的置换申请。可重新上架或编辑后恢复。';
+            hintText = '此货品已下架，无法发起新的置换申请。可重新上架或编辑信息。';
             break;
         case 'exchanged':
             hintText = '此货品已达成置换，不可编辑、下架或发起新申请。如需恢复，请取消已接受的置换申请。';
@@ -269,7 +282,6 @@ function renderDetailActions(item) {
     }
 
     actions.innerHTML = btns;
-
     if (hintText) {
         hint.innerHTML = hintText;
         hint.style.display = 'flex';
@@ -280,16 +292,13 @@ function renderDetailActions(item) {
 
 // ========== 置换申请渲染 ==========
 function renderApplications(apps, item) {
-    // 申请数量 badge
-    document.getElementById('detail-app-count').textContent = apps.length;
+    // 计算待处理数
+    const pendingCount = apps.filter(a => a.status === 'pending').length;
+    document.getElementById('detail-app-count').textContent = pendingCount;
+    document.getElementById('detail-app-count').title = `共 ${apps.length} 条申请，${pendingCount} 条待处理`;
 
-    // 申请按钮可见性
     const applyToggle = document.getElementById('btn-apply-toggle');
-    if (item.status === 'listed') {
-        applyToggle.style.display = '';
-    } else {
-        applyToggle.style.display = 'none';
-    }
+    applyToggle.style.display = item.status === 'listed' ? '' : 'none';
     document.getElementById('apply-form').style.display = 'none';
 
     const list = document.getElementById('application-list');
@@ -298,27 +307,32 @@ function renderApplications(apps, item) {
         return;
     }
 
+    const statusColors = { pending: '#d97706', accepted: '#16a34a', rejected: '#dc2626', cancelled: '#64748b' };
+    const statusBgs = { pending: '#fef3c7', accepted: '#dcfce7', rejected: '#fee2e2', cancelled: '#f1f5f9' };
+
     list.innerHTML = apps.map(a => {
         let actionBtns = '';
-        // 货品已下架/已置换时，申请也不可操作
-        const canOperate = item.status === 'listed' || item.status === 'exchanged';
 
         if (a.status === 'pending' && item.status === 'listed') {
+            // 货品上架中 + 申请待处理 → 可接受/拒绝/取消
             actionBtns = `
                 <button class="btn btn-sm btn-success" onclick="handleApp('${a.id}','accept')">接受</button>
                 <button class="btn btn-sm btn-danger" onclick="handleApp('${a.id}','reject')">拒绝</button>
                 <button class="btn btn-sm btn-secondary" onclick="handleApp('${a.id}','cancel')">取消</button>
             `;
         } else if (a.status === 'accepted') {
+            // 已接受 → 可取消置换
             actionBtns = `<button class="btn btn-sm btn-warning" onclick="handleApp('${a.id}','cancel')">取消置换</button>`;
         } else if (a.status === 'pending' && item.status !== 'listed') {
-            actionBtns = `<span class="op-hint">货品已${statusMap[item.status]}，暂不可操作</span>`;
-        } else {
-            actionBtns = `<span class="op-hint">${statusMap[a.status]}，不可操作</span>`;
+            // 申请待处理但货品已不在上架状态
+            actionBtns = `<span class="op-hint">货品已${statusMap[item.status]}，此申请暂不可操作</span>`;
+        } else if (a.status === 'rejected') {
+            actionBtns = `<span class="op-hint">已拒绝，不可操作</span>`;
+        } else if (a.status === 'cancelled') {
+            actionBtns = `<span class="op-hint">已取消，不可操作</span>`;
         }
 
-        const statusColors = { pending: '#d97706', accepted: '#16a34a', rejected: '#dc2626', cancelled: '#64748b' };
-        const statusBgs = { pending: '#fef3c7', accepted: '#dcfce7', rejected: '#fee2e2', cancelled: '#f1f5f9' };
+        const offerText = a.offer_item ? `提供: ${esc(a.offer_item)}` : '未指定置换物';
 
         return `
             <div class="app-card app-${a.status}">
@@ -326,8 +340,9 @@ function renderApplications(apps, item) {
                     <span class="app-applicant">${esc(a.applicant)}</span>
                     <span class="app-status-badge" style="color:${statusColors[a.status]};background:${statusBgs[a.status]}">${statusMap[a.status]}</span>
                 </div>
-                <div class="app-message">${esc(a.message)}</div>
-                <div class="app-time">申请于 ${formatTime(a.created_at)}${a.updated_at !== a.created_at ? ' · 更新于 ' + formatTime(a.updated_at) : ''}</div>
+                <div class="app-offer">${offerText}</div>
+                ${a.message ? `<div class="app-message">${esc(a.message)}</div>` : ''}
+                <div class="app-time">申请于 ${formatTimeFull(a.created_at)}${a.updated_at !== a.created_at ? ' · 处理于 ' + formatTimeFull(a.updated_at) : ''}</div>
                 <div class="app-actions">${actionBtns}</div>
             </div>
         `;
@@ -344,15 +359,18 @@ function renderStatusHistory(histories) {
 
     el.innerHTML = '<div class="timeline">' + histories.map((h, i) => {
         const isLast = i === histories.length - 1;
-        const fromLabel = h.from_status ? statusMap[h.from_status] : '新建';
+        const fromLabel = h.from_status ? (statusMap[h.from_status] || h.from_status) : '新建';
         const toLabel = statusMap[h.to_status] || h.to_status;
+        const icon = historyIcon(h.reason);
+        const isStateChange = h.from_status !== h.to_status;
+
         return `
             <div class="timeline-item${isLast ? ' timeline-item-active' : ''}">
-                <div class="timeline-dot"></div>
+                <div class="timeline-dot${isStateChange ? ' timeline-dot-event' : ''}"></div>
                 <div class="timeline-content">
-                    <div class="timeline-title">${esc(fromLabel)} → ${esc(toLabel)}</div>
+                    <div class="timeline-title">${icon} ${isStateChange ? esc(fromLabel) + ' → ' + esc(toLabel) : esc(toLabel)}</div>
                     <div class="timeline-reason">${esc(h.reason)}</div>
-                    <div class="timeline-meta">操作人: ${esc(h.operator)} · ${formatTime(h.created_at)}</div>
+                    <div class="timeline-meta">${esc(h.operator)} · ${formatTime(h.created_at)}</div>
                 </div>
             </div>
         `;
@@ -371,20 +389,22 @@ function showApplyForm() {
 
 async function submitApplication() {
     const applicant = document.getElementById('apply-applicant').value.trim();
+    const offerItem = document.getElementById('apply-offer-item').value.trim();
     const message = document.getElementById('apply-message').value.trim();
     if (!applicant) { showToast('请填写申请人名字', 'error'); return; }
+    if (!offerItem) { showToast('请填写你能提供的置换物', 'error'); return; }
     try {
         await api('/items/' + currentItem.id + '/applications', {
             method: 'POST',
-            body: JSON.stringify({ applicant, message }),
+            body: JSON.stringify({ applicant, offer_item: offerItem, message }),
         });
         showToast('申请已提交');
         document.getElementById('apply-applicant').value = '';
+        document.getElementById('apply-offer-item').value = '';
         document.getElementById('apply-message').value = '';
         document.getElementById('apply-form').style.display = 'none';
-        // 重新加载完整详情保证数据一致
-        loadDetail(currentItem.id);
-        loadStats();
+        // 全量刷新
+        refreshAll();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
@@ -396,9 +416,8 @@ async function handleApp(appId, action) {
         });
         const actionLabels = { accept: '已接受', reject: '已拒绝', cancel: '已取消' };
         showToast(actionLabels[action] || '操作成功');
-        // 重新加载完整详情（状态、申请、历史全部刷新）
-        loadDetail(currentItem.id);
-        loadStats();
+        // 全量刷新：详情（含申请+历史）+ 统计
+        refreshAll();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
@@ -410,8 +429,7 @@ async function delistItem(id) {
             body: JSON.stringify({ status: 'delisted' }),
         });
         showToast('已下架');
-        loadDetail(id);
-        loadStats();
+        refreshAll();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
@@ -422,8 +440,7 @@ async function relistItem(id) {
             body: JSON.stringify({ status: 'listed' }),
         });
         showToast('已重新上架');
-        loadDetail(id);
-        loadStats();
+        refreshAll();
     } catch (e) { showToast(e.message, 'error'); }
 }
 
@@ -432,7 +449,6 @@ function showCreateForm() {
     document.getElementById('form-title').textContent = '发布新货品';
     document.getElementById('form-item-id').value = '';
     document.getElementById('item-form').reset();
-    // 新建返回列表
     document.getElementById('form-back-btn').onclick = () => navigateTo('list');
     document.getElementById('form-cancel-btn').onclick = () => navigateTo('list');
     navigateTo('form');
@@ -440,6 +456,7 @@ function showCreateForm() {
 
 function showEditForm(id) {
     const item = currentItem;
+    if (!item) return;
     document.getElementById('form-title').textContent = '编辑货品';
     document.getElementById('form-item-id').value = item.id;
     document.getElementById('form-field-title').value = item.title;
@@ -449,7 +466,6 @@ function showEditForm(id) {
     document.getElementById('form-field-exchange').value = item.expected_exchange;
     document.getElementById('form-field-publisher').value = item.publisher;
     document.getElementById('form-field-description').value = item.description;
-    // 编辑返回详情
     document.getElementById('form-back-btn').onclick = () => navigateTo('detail', item.id);
     document.getElementById('form-cancel-btn').onclick = () => navigateTo('detail', item.id);
     navigateTo('form');
@@ -472,12 +488,10 @@ async function submitItemForm(e) {
         if (id) {
             await api('/items/' + id, { method: 'PUT', body: JSON.stringify(payload) });
             showToast('编辑成功');
-            // 编辑保存后回到该货品详情
             navigateTo('detail', id);
         } else {
             const newItem = await api('/items', { method: 'POST', body: JSON.stringify(payload) });
             showToast('发布成功');
-            // 新建后回到该货品详情
             navigateTo('detail', newItem.id);
         }
     } catch (e) { showToast(e.message, 'error'); }
@@ -485,9 +499,8 @@ async function submitItemForm(e) {
 
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
-    // 显示访问入口
     const urlEl = document.getElementById('header-url');
-    urlEl.textContent = window.location.href;
+    urlEl.textContent = window.location.origin + '  ← 当前访问入口';
 
     loadFilterOptions();
     loadItems();
